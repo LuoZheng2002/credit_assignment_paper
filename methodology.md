@@ -229,26 +229,26 @@ In-distribution datasets:
 
 - DeepMath
 - MATH
-- MetaMathQA
+- NuminaMath
 
 In-distribution train/validation construction:
 
-- We construct both `hybrid_train.jsonl` and `hybrid_val.jsonl` from the train splits of DeepMath, MATH, and MetaMathQA.
-- Per dataset, training uses 5,000 samples and validation uses 1,000 samples.
-- Validation samples are explicitly non-overlapping with training samples by using disjoint index ranges (`question_id` 0-4999 for train and 5000-5999 for validation).
-- We enforce a dataset-size assertion before extraction: each in-distribution dataset must have at least 6,000 train rows so both splits can be formed without overlap.
+- We construct both `hybrid_train.jsonl` and `hybrid_val.jsonl` from the train splits of DeepMath, MATH, and NuminaMath.
+- Training uses a 1:2:2 ratio across datasets: MATH contributes 6,500 samples (all available train rows), while DeepMath and NuminaMath each contribute 13,000 samples. Validation uses 1,000 samples per dataset.
+- The training set is interleaved so that each consecutive group of 5 rows contains 1 MATH, 2 DeepMath, and 2 NuminaMath samples, ensuring balanced exposure at any prefix of the file.
+- Validation samples are explicitly non-overlapping with training samples by using disjoint index ranges per dataset: MATH train indices 0–6,499 (val 6,500–7,499), DeepMath train 0–12,999 (val 13,000–13,999), NuminaMath train 0–12,999 (val 13,000–13,999).
+- We enforce a per-dataset size assertion before extraction: MATH must have at least 7,500 train rows, and DeepMath and NuminaMath must each have at least 14,000 train rows, so both splits can be formed without overlap.
 
 Out-of-distribution datasets:
 
 - AMC2023
 - GaoKao Math 2024
 - CollegeMath
-- NuminaMath
 
 Test set construction:
 
-- We construct `hybrid_test.jsonl` by concatenating samples from all seven evaluation datasets in the following order: DeepMath, MATH, MetaMathQA, AMC2023, GaoKao Math 2024, CollegeMath, NuminaMath.
-- Per dataset, up to 1,000 samples are drawn from the test split where available (MATH, AMC2023, GaoKao Math 2024, CollegeMath, NuminaMath). For DeepMath and MetaMathQA, which do not expose dedicated test splits in this pipeline, samples are drawn from the train split starting after the combined train+val clearance of 6,000 rows (indices 0-5999 reserved for `hybrid_train.jsonl` and `hybrid_val.jsonl`), ensuring no overlap with the in-distribution training or validation sets.
+- We construct `hybrid_test.jsonl` by concatenating samples from all six evaluation datasets in the following order: DeepMath, MATH, NuminaMath, AMC2023, GaoKao Math 2024, CollegeMath.
+- Per dataset, up to 1,000 samples are drawn from the test split where available (MATH, NuminaMath, AMC2023, GaoKao Math 2024, CollegeMath). For DeepMath, which does not expose a dedicated test split in this pipeline, samples are drawn from the train split starting after the per-dataset train+val clearance (13,000 train + 1,000 val = 14,000 reserved for `hybrid_train.jsonl` and `hybrid_val.jsonl`), ensuring no overlap with the in-distribution training or validation sets.
 - For GaoKao Math 2024, we use the `year == 2024` subset of the published `FrankieYao/GaoKaoMath` test split.
 - Samples from datasets with more than 1,000 eligible rows are randomly subsampled with a fixed seed (42). Datasets with fewer than 1,000 eligible rows use all available rows without repetition.
 - Total test set size is approximately 4,000-5,000 rows, depending on the sizes of the smaller OOD benchmarks.
@@ -260,7 +260,7 @@ Test set construction:
 1. Measure baseline pass@1 accuracy for each model on all six evaluation datasets.
 2. Train TreeMAPPO on the in-distribution training data (`hybrid_train.jsonl`) for each model.
 3. Use in-distribution validation data (`hybrid_val.jsonl`) for checkpoint selection and hyperparameter control.
-4. Re-evaluate pass@1 on all seven datasets.
+4. Re-evaluate pass@1 on all six datasets.
 5. Run five independent trials and report confidence intervals.
 
 ### Ablation Studies

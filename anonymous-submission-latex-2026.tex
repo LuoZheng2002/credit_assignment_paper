@@ -225,15 +225,14 @@ The current experimental plan covers the following model-condition families.
 For the main tables, tool-enabled and no-tool variants of the same backbone should be treated as separate model-condition groups, since the prompting interface and action space differ.
 
 \subsection{Datasets}
-Training and validation are built from DeepMath, MATH, and GSM8K.
+Training and validation are built from DeepMath, MATH, and NuminaMath.
 \begin{itemize}
     \item \texttt{hybrid\_train.sqlite}: 5{,}000 samples per dataset, interleaved across the three in-distribution datasets.
     \item \texttt{hybrid\_val.sqlite}: 1{,}000 validation samples per dataset drawn from disjoint index ranges after the training slice.
 \end{itemize}
 
-We also construct an aggregated held-out evaluation database from six datasets in this order: DeepMath, MATH, GSM8K, AIME24, AIME25, and AMC23. For datasets with more than 1{,}000 test rows, 1{,}000 are sampled with seed 42; for DeepMath, which lacks a dedicated test split in the current pipeline, evaluation rows are drawn from the training split after clearing the 6{,}000 training-plus-validation examples reserved for in-distribution use.
+We also construct an aggregated held-out evaluation database from six datasets in this order: DeepMath, MATH, NuminaMath, AMC2023, GaoKao Math 2024, and CollegeMath. For datasets with more than 1{,}000 test rows, 1{,}000 are sampled with seed 42; for DeepMath, which lacks a dedicated test split in the current pipeline, evaluation rows are drawn from the training split after clearing the 6{,}000 training-plus-validation examples reserved for in-distribution use.
 
-\draftnote{Note on a current draft mismatch: the implementation presently builds 6 evaluation datasets (3 in-distribution + 3 out-of-distribution), whereas the reporting note mentions 7 columns with 4 out-of-distribution datasets. The table templates below follow the implemented 6-dataset setup and can be extended by one extra OOD column if an additional benchmark is added later.}
 
 \subsection{Training and Evaluation Protocol}
 An orchestration epoch consists of four stages: validation rollout, training rollout collection, training-set generation, and training. Across epochs, the dataset is regenerated using the model produced by the previous epoch.
@@ -264,7 +263,7 @@ Table~\ref{tab:main-results} is structured to compare base, GRPO, and \ours\ acr
 \resizebox{\textwidth}{!}{%
 \begin{tabular}{llccccccc}
 \hline
-Model family & Setup & DeepMath & MATH & GSM8K & AIME24 & AIME25 & AMC23 & Avg. \\
+Model family & Setup & DeepMath & MATH & NuminaMath & AMC2023 & GaoKao Math 2024 & CollegeMath & Avg. \\
 \hline
 Qwen2.5-7B + tool & Base & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} \\
 Qwen2.5-7B + tool & GRPO & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} \\
@@ -311,7 +310,7 @@ The main ablation table is designed around the conditions explicitly implemented
 \resizebox{\textwidth}{!}{%
 \begin{tabular}{llccccccc}
 \hline
-Model family & Setup & DeepMath & MATH & GSM8K & AIME24 & AIME25 & AMC23 & Avg. \\
+Model family & Setup & DeepMath & MATH & NuminaMath & AMC2023 & GaoKao Math 2024 & CollegeMath & Avg. \\
 \hline
 Qwen2.5-7B + tool & Base & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} \\
 Qwen2.5-7B + tool & GRPO & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} \\
