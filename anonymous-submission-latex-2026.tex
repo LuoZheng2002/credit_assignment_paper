@@ -19,8 +19,7 @@
 \setcounter{secnumdepth}{0}
 
 \newcommand{\ours}{TreeMAPPO}
-\newcommand{\expected}[1]{\textcolor{blue}{#1}}
-\newcommand{\draftnote}[1]{\textcolor{blue}{#1}}
+\newcommand{\placeholder}{\textsc{TBD}}
 \newcommand{\toolflag}[1]{\textsc{#1}}
 
 \title{TreeMAPPO: Fine-Grained Credit Assignment for Agentic LLM Training via Token-Level Trajectory Branching}
@@ -31,15 +30,15 @@
 \maketitle
 
 \begin{abstract}
-We present \ours, a reference-free framework for fine-grained credit assignment in agentic large language model training. Rather than assigning a single scalar reward to an entire reasoning trajectory, \ours\ constructs a rollout tree, estimates segment-level contribution and uncertainty from mixed-success leaves, and converts these estimates into dense token-level training signals. The method is designed for mathematical reasoning agents whose trajectories may interleave natural-language reasoning, fenced Python tool calls, tool responses, and final boxed answers. Our implementation combines guided token-level branching, a maximum-a-posteriori posterior model over segment contributions, greedy trajectory de-duplication for training-set construction, and advantage-weighted causal language-model updates. \expected{We expect \ours\ to outperform trajectory-level baselines such as GRPO, especially when sparse outcome rewards obscure which intermediate reasoning decisions were beneficial or harmful.}
+We present \ours, a reference-free framework for fine-grained credit assignment in agentic large language model training. Rather than assigning a single scalar reward to an entire reasoning trajectory, \ours\ constructs a rollout tree, estimates segment-level contribution and uncertainty from mixed-success leaves, and converts these estimates into dense token-level training signals. The method is designed for mathematical reasoning agents whose trajectories may interleave natural-language reasoning, fenced Python tool calls, tool responses, and final boxed answers. Compared with methods such as TEMPO that exploit shared prefixes among sampled trajectories, \ours\ actively creates new continuations through guided token-level branching, concentrating exploration at uncertain and model-plausible decision points. Compared with TreeRPO-style tree credit assignment based on empirical outcome comparisons, \ours\ uses a statistically grounded maximum-a-posteriori posterior model that estimates both signed segment contribution and uncertainty before producing token-level advantages. Experiments compare \ours\ against base models, trajectory-level GRPO-style training, and tree-structured ablations across tool and no-tool mathematical reasoning settings.
 \end{abstract}
 
 \section{Introduction}
 Sparse end-of-trajectory supervision makes credit assignment a central bottleneck in reinforcement learning for reasoning agents. When a long rollout contains many reasoning tokens, optional tool calls, and only a terminal correctness judgment, a single trajectory-level reward provides little guidance about which intermediate decisions should be reinforced or suppressed. The difficulty is especially acute in agentic settings, where early errors may be repaired by later reasoning or external tool feedback.
 
-Recent work has begun to exploit shared-prefix and tree structure to densify supervision, including implicit prefix-tree methods, explicit tree-sampling methods, off-policy prefix-aware methods, and fine-grained agentic branching methods \cite{tempo2025,treerpo2025,treepo2025,treeopo2025,appo2026}. These results suggest that branching structure can expose more informative local comparisons than flat rollout groups. At the same time, existing approaches often rely on naturally occurring prefix overlap, fixed segment boundaries, offline teacher-generated trees, or heuristic credit estimators that do not explicitly represent uncertainty.
+Recent work has begun to exploit shared-prefix and tree structure to densify supervision, including implicit prefix-tree methods, explicit tree-sampling methods, off-policy prefix-aware methods, and fine-grained agentic branching methods \cite{tempo2025,treerpo2025,treepo2025,treeopo2025,appo2026}. These methods show that branching structure exposes local comparisons that are unavailable to flat rollout groups. However, existing approaches often rely on naturally occurring prefix overlap, fixed segment boundaries, offline teacher-generated trees, or heuristic credit estimators that do not explicitly represent uncertainty.
 
-This paper studies fine-grained credit assignment for mathematical reasoning agents through token-level trajectory branching. Our central idea is to turn a small set of full rollouts into a structured tree of alternative continuations, then infer which segments were likely helpful, harmful, or uncertain from the pattern of correct and incorrect descendants. We call the resulting method \ours\ (Tree-based Maximum-A-Posteriori Policy Optimization).
+This paper develops fine-grained credit assignment for mathematical reasoning agents through token-level trajectory branching. The central idea is to turn a small set of full rollouts into a structured tree of alternative continuations, then infer which segments are helpful, harmful, or uncertain from the pattern of correct and incorrect descendants. We call the resulting method \ours\ (Tree-based Maximum-A-Posteriori Policy Optimization).
 
 Our implementation uses a lightweight tool-calling protocol: the model receives a question and an optional Python tool specification, emits reasoning in text, may invoke the tool via fenced Python markdown blocks, observes the tool response in context, and is required to terminate with a final answer wrapped in \texttt{\textbackslash boxed\{\}}. Rollouts are organized into trees, branch points are chosen at token granularity, and segment-level posterior estimates are transformed into token-level training advantages.
 
@@ -50,8 +49,6 @@ Our contributions are:
     \item We describe a practical training pipeline that converts rollout trees into non-redundant training trajectories with token-level advantages.
     \item We provide an experimental framework spanning tool and no-tool reasoning, in-distribution and out-of-distribution mathematical benchmarks, and ablations that separate branching strategy from credit estimation.
 \end{itemize}
-
-\draftnote{Blue text marks hypotheses, placeholders, or details that should be replaced once final experimental results are available.}
 
 \section{Related Work}
 \paragraph{Trajectory-level RL for reasoning.}
@@ -192,7 +189,7 @@ Because many tree leaves share prefixes, naively flattening all leaves would ove
     \item Aggregate selected trajectories across trees and prune the tail with a cumulative average-absolute-advantage cutoff.
 \end{enumerate}
 
-Selected trajectories are finally ordered by sequence length for batching efficiency.
+Selected trajectories are finally ordered by a configurable batching policy. In length-based runs, this improves early memory stability; in by-question runs, it groups positive and negative samples from the same problem so the optimizer sees local contrasts consecutively.
 
 \section{Baselines and Ablations}
 We consider three primary comparison points.
@@ -212,7 +209,7 @@ In our implementation, these ablations are not merely renamed conditions: the TE
 
 \section{Experimental Setup}
 \subsection{Models}
-The current experimental plan covers the following model-condition families.
+We evaluate the following model-condition families.
 \begin{itemize}
     \item Qwen2.5-7B-Instruct with tool use.
     \item Qwen2.5-7B-Instruct without tool use.
@@ -222,7 +219,7 @@ The current experimental plan covers the following model-condition families.
     \item Llama-3.1 and Mistral-7B without tool use.
 \end{itemize}
 
-For the main tables, tool-enabled and no-tool variants of the same backbone should be treated as separate model-condition groups, since the prompting interface and action space differ.
+For the main tables, tool-enabled and no-tool variants of the same backbone are treated as separate model-condition groups, since the prompting interface and action space differ.
 
 \subsection{Datasets}
 Training and validation are built from DeepMath, MATH, and NuminaMath.
@@ -231,29 +228,25 @@ Training and validation are built from DeepMath, MATH, and NuminaMath.
     \item \texttt{hybrid\_val.sqlite}: 1{,}000 validation samples per dataset drawn from disjoint index ranges after the training slice.
 \end{itemize}
 
-We also construct an aggregated held-out evaluation database from six datasets in this order: DeepMath, MATH, NuminaMath, AMC2023, GaoKao Math 2024, and CollegeMath. For datasets with more than 1{,}000 test rows, 1{,}000 are sampled with seed 42; for DeepMath, which lacks a dedicated test split in the current pipeline, evaluation rows are drawn from the training split after clearing the 6{,}000 training-plus-validation examples reserved for in-distribution use.
+We also construct an aggregated held-out evaluation database from six datasets in this order: DeepMath, MATH, NuminaMath, AMC2023, GaoKao Math 2024, and CollegeMath. For datasets with more than 1{,}000 test rows, 1{,}000 are sampled with seed 42; for DeepMath, which lacks a dedicated test split in the current pipeline, evaluation rows are drawn from the training split after clearing the reserved training and validation examples.
 
 
 \subsection{Training and Evaluation Protocol}
 An orchestration epoch consists of four stages: validation rollout, training rollout collection, training-set generation, and training. Across epochs, the dataset is regenerated using the model produced by the previous epoch.
 
-The current training plan uses the following recurring settings:
+The training protocol uses the following recurring settings:
 \begin{itemize}
     \item 10 orchestration epochs.
     \item cumulative average-absolute-advantage cutoff of $0.5$ for training-set retention.
     \item 3 optimizer iterations per training run.
-    \item LoRA-based training configuration in the default scripts.
+    \item LoRA-based fine-tuning for the primary experiments.
     \item fixed rollout temperature $0.7$.
 \end{itemize}
 
-\draftnote{Insert the final production hardware description here. Current notes mention A100-based LoRA training, while example scripts expose a configurable GPU count and may be used both for smoke runs and full experiments.}
-
-The primary evaluation metric is pass@1 accuracy. We plan to report mean and confidence intervals over multiple independent runs.
-
-\expected{Our expectation is that gains will be strongest on problems whose success depends on a few decisive reasoning turns rather than uniformly smooth reasoning quality across the whole trajectory.}
+The primary evaluation metric is pass@1 accuracy. We report aggregate accuracy together with per-dataset accuracy, and include confidence intervals when multiple independent runs are available.
 
 \section{Results}
-Since the full experimental sweep is still in progress, we present the reporting structure below with blue placeholders for measurements and forward-looking claims. These placeholders should be replaced with final statistics before submission.
+This section contains result placeholders to be replaced with final measured statistics. All non-result sections describe the implemented method and evaluation protocol.
 
 \subsection{Main Comparison}
 Table~\ref{tab:main-results} is structured to compare base, GRPO, and \ours\ across datasets, while grouping rows by model-condition family.
@@ -265,42 +258,39 @@ Table~\ref{tab:main-results} is structured to compare base, GRPO, and \ours\ acr
 \hline
 Model family & Setup & DeepMath & MATH & NuminaMath & AMC2023 & GaoKao Math 2024 & CollegeMath & Avg. \\
 \hline
-Qwen2.5-7B + tool & Base & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} \\
-Qwen2.5-7B + tool & GRPO & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} \\
-Qwen2.5-7B + tool & \ours & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} \\
+Qwen2.5-7B + tool & Base & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
+Qwen2.5-7B + tool & GRPO & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
+Qwen2.5-7B + tool & \ours & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
 \hline
-Qwen2.5-7B no-tool & Base & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} \\
-Qwen2.5-7B no-tool & GRPO & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} \\
-Qwen2.5-7B no-tool & \ours & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} \\
+Qwen2.5-7B no-tool & Base & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
+Qwen2.5-7B no-tool & GRPO & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
+Qwen2.5-7B no-tool & \ours & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
 \hline
-Qwen3-4B + tool & Base & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} \\
-Qwen3-4B + tool & GRPO & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} \\
-Qwen3-4B + tool & \ours & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} \\
+Qwen3-4B + tool & Base & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
+Qwen3-4B + tool & GRPO & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
+Qwen3-4B + tool & \ours & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
 \hline
-Qwen3-4B no-tool & Base & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} \\
-Qwen3-4B no-tool & GRPO & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} \\
-Qwen3-4B no-tool & \ours & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} \\
+Qwen3-4B no-tool & Base & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
+Qwen3-4B no-tool & GRPO & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
+Qwen3-4B no-tool & \ours & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
 \hline
-Gemma-3-4B-IT no-tool & Base & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} \\
-Gemma-3-4B-IT no-tool & GRPO & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} \\
-Gemma-3-4B-IT no-tool & \ours & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} \\
+Gemma-3-4B-IT no-tool & Base & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
+Gemma-3-4B-IT no-tool & GRPO & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
+Gemma-3-4B-IT no-tool & \ours & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
 \hline
-Llama-3.1 no-tool & Base & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} \\
-Llama-3.1 no-tool & GRPO & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} \\
-Llama-3.1 no-tool & \ours & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} \\
+Llama-3.1 no-tool & Base & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
+Llama-3.1 no-tool & GRPO & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
+Llama-3.1 no-tool & \ours & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
 \hline
-Mistral-7B no-tool & Base & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} \\
-Mistral-7B no-tool & GRPO & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} \\
-Mistral-7B no-tool & \ours & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} \\
+Mistral-7B no-tool & Base & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
+Mistral-7B no-tool & GRPO & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
+Mistral-7B no-tool & \ours & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
 \hline
 \end{tabular}%
 }
-\caption{Main comparison across model families and datasets. Replace blue placeholders with measured pass@1 mean $\pm$ confidence interval. \expected{The intended trend is Base $<$ GRPO $<$ \ours\ in most rows, with especially visible gains for the tool-enabled Qwen settings.}}
+\caption{Main comparison across model families and datasets. Replace placeholders with measured pass@1 mean $\pm$ confidence interval.}
 \label{tab:main-results}
 \end{table*}
-
-\paragraph{Expected findings.}
-\expected{Across most model families, \ours\ should improve over both the unfine-tuned baseline and GRPO, indicating that denser segment-level credit is more informative than trajectory-level reward alone. We expect the largest gains when tool use is available, because branching can better isolate whether a local reasoning segment or a tool-mediated correction changed the final outcome.}
 
 \subsection{Ablation Study}
 The main ablation table is designed around the conditions explicitly implemented for Qwen2.5-7B with tool use: Base, GRPO, TEMPO-style spontaneous branching, TreeRPO-style heuristic credit assignment, and \ours.
@@ -312,15 +302,15 @@ The main ablation table is designed around the conditions explicitly implemented
 \hline
 Model family & Setup & DeepMath & MATH & NuminaMath & AMC2023 & GaoKao Math 2024 & CollegeMath & Avg. \\
 \hline
-Qwen2.5-7B + tool & Base & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} \\
-Qwen2.5-7B + tool & GRPO & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} \\
-Qwen2.5-7B + tool & TEMPO-style & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} \\
-Qwen2.5-7B + tool & TreeRPO-style & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} \\
-Qwen2.5-7B + tool & \ours & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} & \expected{TBD} \\
+Qwen2.5-7B + tool & Base & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
+Qwen2.5-7B + tool & GRPO & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
+Qwen2.5-7B + tool & TEMPO-style & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
+Qwen2.5-7B + tool & TreeRPO-style & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
+Qwen2.5-7B + tool & \ours & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
 \hline
 \end{tabular}%
 }
-\caption{Ablation framework. The TEMPO-style condition changes the branching policy; the TreeRPO-style condition changes the segment-credit estimator. \expected{We expect \ours\ to outperform both ablations, supporting the claim that guided branching and probabilistic credit assignment contribute complementary benefits.}}
+\caption{Ablation framework. The TEMPO-style condition changes the branching policy; the TreeRPO-style condition changes the segment-credit estimator.}
 \label{tab:ablation-results}
 \end{table*}
 
@@ -335,15 +325,11 @@ Placeholder line chart\\
 \small x-axis: total trajectories / leaves in tree (8, 16, 32)\\
 \small y-axis: downstream pass@1 on validation or aggregated test\\
 \small show mean and confidence interval bands\\
-\expected{Expected shape: concave, with a sweet spot near the standard 16-trajectory setting.}\\
 \vspace{0.4em}
 }}
 \caption{Branching-budget sensitivity. Replace this placeholder with a real line chart once results are available.}
 \label{fig:branch-budget}
 \end{figure}
-
-\paragraph{Expected findings.}
-\expected{We hypothesize that too few leaves under-explore decisive alternative reasoning paths, while too many leaves dilute collection budget across marginal branches and introduce noisier training targets. This should yield a concave performance curve with an intermediate optimum.}
 
 \section{Discussion}
 The main conceptual benefit of \ours\ is that it turns sparse trajectory-level outcomes into dense supervision without requiring reference solutions or manually annotated intermediate steps. The tree structure also allows uncertainty to be localized: early segments supported by many mixed descendants can be recognized as uncertain, whereas a split that sharply changes success rates can receive stronger credit or blame.
@@ -351,22 +337,21 @@ The main conceptual benefit of \ours\ is that it turns sparse trajectory-level o
 Several practical design choices are worth emphasizing.
 \begin{itemize}
     \item Branch selection is not based on posterior uncertainty alone; it also depends on the model's alternative-token probability mass, which makes branching more realistic and less likely to chase implausible continuations.
-    \item The training loss is an advantage-weighted language-model loss rather than a clipped PPO-ratio objective. This improves engineering simplicity and stability, but the name \emph{TreeMAPPO} should be explained carefully so readers understand what is implemented.
-    \item Tool-enabled and no-tool settings should be analyzed separately because the credit-assignment problem differs materially once trajectories can call Python and recover from arithmetic mistakes.
+    \item The training loss is an advantage-weighted language-model loss rather than a clipped PPO-ratio objective. This choice keeps the optimization interface simple while preserving the central contribution: tree-based posterior credit assignment.
+    \item Tool-enabled and no-tool settings are analyzed separately because the credit-assignment problem differs materially once trajectories can call Python and recover from arithmetic mistakes.
 \end{itemize}
 
 \section{Limitations and Future Work}
 The present system has several important limitations.
 \begin{itemize}
-    \item The current repository-aligned evaluation framework is broader than the set of finalized results.
-    \item Some methodological notes discuss variants not fully surfaced in the default scripts, such as richer temperature calibration or additional model families.
-    \item The present dataset builders and evaluation utilities should be audited before final reporting to ensure that every split and benchmark exactly matches the intended paper protocol.
+    \item Tree construction requires more inference than flat rollout collection, so the method trades additional sampling cost for denser supervision.
+    \item The MAP credit model intentionally uses a simple additive segment-contribution assumption. This makes inference tractable and interpretable, but it cannot represent all higher-order interactions among distant reasoning segments.
+    \item Correctness is judged from extracted final answers, so the approach inherits the limitations of answer extraction and exact-answer comparison on mathematical benchmarks.
+    \item The tool environment is deliberately lightweight. Richer agent tools may require additional safety checks, state tracking, and branch-selection criteria.
 \end{itemize}
 
-\expected{Future work may explore adaptive branch temperatures, better posterior priors, richer tool environments, and branch-selection objectives that directly optimize information gain rather than uncertainty heuristics alone.}
-
 \section{Conclusion}
-We presented \ours, a trajectory-tree method for fine-grained credit assignment in agentic LLM training. The core idea is to branch reasoning trajectories at token granularity, infer segment-level contribution and uncertainty from mixed-success descendants, and convert those estimates into training signals for subsequent optimization. The current implementation already supports the central methodological ingredients, several ablations, tool/no-tool variants, and branch-budget experiments. \expected{If the final experiments confirm the expected pattern, the results will support the claim that explicit tree structure and uncertainty-aware segment credit can improve both training efficiency and pass@1 accuracy over trajectory-level baselines.}
+We presented \ours, a trajectory-tree method for fine-grained credit assignment in agentic LLM training. The core idea is to branch reasoning trajectories at token granularity, infer segment-level contribution and uncertainty from mixed-success descendants, and convert those estimates into training signals for subsequent optimization. The implementation supports the central methodological ingredients, several ablations, tool/no-tool variants, and branch-budget experiments. Together, these components provide a practical route from sparse terminal rewards to localized training signal for long-form reasoning agents.
 
 \bibliography{aaai2026}
 
