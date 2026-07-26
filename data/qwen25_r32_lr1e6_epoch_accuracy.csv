@@ -1,0 +1,18 @@
+scenario,model,method,lora_rank,learning_rate,epoch,accuracy,notes
+notool,qwen25,GRPO,32,1e-6,0,0.6691275239,base validation
+notool,qwen25,GRPO,32,1e-6,1,0.670773,trained checkpoint
+notool,qwen25,GRPO,32,1e-6,2,0.677551,trained checkpoint
+notool,qwen25,GRPO,32,1e-6,3,0.6853477359,best checkpoint
+notool,qwen25,GRPO,32,1e-6,4,0.670007,trained checkpoint
+notool,qwen25,GRPO,32,1e-6,5,0.6664460897,trained checkpoint
+notool,qwen25,TreeMAPPO,32,1e-6,0,0.6761107445,base validation
+notool,qwen25,TreeMAPPO,32,1e-6,1,0.669168,trained checkpoint
+notool,qwen25,TreeMAPPO,32,1e-6,2,0.671159,trained checkpoint
+notool,qwen25,TreeMAPPO,32,1e-6,3,0.670990,trained checkpoint
+notool,qwen25,TreeMAPPO,32,1e-6,4,0.685408,trained checkpoint
+notool,qwen25,TreeMAPPO,32,1e-6,5,0.674747,trained checkpoint
+notool,qwen25,TreeMAPPO,32,1e-6,6,0.681728,trained checkpoint
+notool,qwen25,TreeMAPPO,32,1e-6,7,0.678912,trained checkpoint
+notool,qwen25,TreeMAPPO,32,1e-6,8,0.682124,trained checkpoint
+notool,qwen25,TreeMAPPO,32,1e-6,9,0.679004,trained checkpoint
+notool,qwen25,TreeMAPPO,32,1e-6,10,0.6931359172,best checkpoint

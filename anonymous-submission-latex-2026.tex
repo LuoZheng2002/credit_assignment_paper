@@ -50,9 +50,19 @@ Our contributions are:
     \item We provide an experimental framework spanning tool and no-tool reasoning, in-distribution and out-of-distribution mathematical benchmarks, and ablations that separate branching strategy from credit estimation.
 \end{itemize}
 
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{images/tree_mappo_methodology.pdf}
+\caption{Method overview. \ours\ samples base-policy trajectories, expands selected token-level branch points, infers segment-level contribution and uncertainty from leaf correctness, and converts the resulting posterior estimates into token-level advantages for adapter training.}
+\label{fig:methodology}
+\end{figure*}
+
 \section{Related Work}
 \paragraph{Trajectory-level RL for reasoning.}
-Reinforcement learning with verifiable rewards has become a standard recipe for improving mathematical and agentic reasoning, but trajectory-level objectives still face a severe credit-assignment problem. Actor--critic methods such as PPO provide token-level advantages through a learned value function \cite{ppo17}, while critic-free group-relative methods simplify training but typically distribute supervision at the trajectory level. This tension has motivated a recent wave of work on structured rollouts and finer-grained credit.
+Reinforcement learning with verifiable rewards has become a standard recipe for improving mathematical and agentic reasoning, because final-answer correctness can often be checked automatically. PPO remains a canonical policy-optimization baseline: it stabilizes policy updates with a clipped surrogate objective and obtains token-level advantages through a learned value function \cite{ppo17}. GRPO, introduced in DeepSeekMath, removes the critic by normalizing outcome rewards within groups of sampled responses, substantially reducing training complexity while retaining the appeal of verifiable rewards \cite{deepseekmath2024}. The limitation of both trajectory-level and group-relative outcome supervision is the one targeted here: when a long response receives only terminal feedback, many irrelevant tokens are reinforced or suppressed together with the decisive reasoning steps.
+
+\paragraph{Process supervision and verifier-based credit.}
+A complementary line of work makes supervision denser by judging intermediate reasoning steps. Let’s Verify Step by Step showed that process supervision can outperform outcome-only supervision on mathematical reasoning by training process reward models from step-level human labels \cite{lightman2023letsverify}. This line establishes the value of fine-grained credit, but it changes the supervision regime: it depends on annotated intermediate labels, learned verifiers, or additional reward-model infrastructure. \ours\ instead keeps the outcome-only setting and infers local credit from the structure of sampled rollouts. The distinction is important methodologically: our goal is not to build a stronger verifier, but to convert sparse terminal correctness into localized training signals without step-level references.
 
 \paragraph{Implicit tree and shared-prefix methods.}
 TEMPO \cite{tempo2025} converts a group of sampled responses into a prefix tree and adds branch-gated temporal-difference corrections on top of a GRPO-style training loop. Its main appeal is that it preserves a relatively simple rollout interface while extracting token-level signal where natural branching occurs. Our method differs in that we do not rely on incidental prefix overlap alone; instead, we explicitly create new branches at selected token positions, which provides direct control over branching density and lets exploration be driven by posterior uncertainty.
@@ -65,6 +75,16 @@ Tree-OPO \cite{treeopo2025} uses teacher-generated MCTS prefixes and staged adva
 
 \paragraph{Agentic RL and branching granularity.}
 APPO \cite{appo2026} studies branching and credit assignment in tool-using agents, arguing that influential decision points are not confined to tool-call boundaries or coarse workflow stages. This observation aligns closely with our setting. The main methodological difference is that APPO uses a branching score and procedure-level advantage scaling, whereas \ours\ combines explicit token-level branching with posterior inference over signed segment contribution and uncertainty.
+
+\paragraph{Tool-augmented mathematical reasoning and benchmarks.}
+Our agent protocol is also related to work on tool-augmented reasoning. PAL and Program-of-Thoughts showed that language models can delegate arithmetic or symbolic computation to Python programs, improving numerical reasoning by separating decomposition from execution \cite{gao2022pal,chen2022pot}. ReAct generalized interleaved reasoning and acting, while Toolformer studied how models can learn tool use from limited demonstrations \cite{yao2022react,schick2023toolformer}. These methods motivate the mixed text--tool trajectories considered here, but they primarily address inference-time tool use rather than training-time credit assignment. Our evaluation setting builds on mathematical reasoning resources such as MATH \cite{hendrycks2021math} and recent verifiable training corpora such as DeepMath-103K \cite{he2025deepmath103k}; the broader benchmark mix is intended to test whether tree-based credit assignment transfers beyond the distribution used to construct training trajectories.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{images/tree_mappo_comparison.pdf}
+\caption{Comparison of credit-assignment structures. Trajectory-level GRPO assigns one normalized outcome signal to every token; TEMPO extracts branch-gated corrections from natural shared prefixes; TreeRPO uses fixed-step tree sampling and empirical child-group rewards; \ours\ combines guided token-level branching with posterior segment-credit inference.}
+\label{fig:method-comparison}
+\end{figure*}
 
 
 
