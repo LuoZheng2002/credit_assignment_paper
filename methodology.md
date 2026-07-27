@@ -278,6 +278,9 @@ Test set construction:
 - Primary metric: pass@1 accuracy.
 - Secondary reporting: confidence intervals from five runs.
 - Evaluation scope: both in-distribution and out-of-distribution benchmarks.
+- Final serious tests use five independent rollouts per question with flat evaluation
+  trees (`num_trunks = num_leaves = 5`) to reduce stochastic evaluation noise
+  while preserving the pass@1 interpretation.
 
 ### Fairness and Control Variables
 
