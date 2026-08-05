@@ -196,18 +196,18 @@ Selected trajectories are ordered by sequence length to improve batch efficiency
 
 We define **one epoch as one training program run** over an epoch-specific training dataset.
 
-- Within a run, `num_iterations` controls repeated passes over that epoch's dataset; these are optimization iterations, not epochs.
+- Within a run, the iteration limit controls repeated passes over that epoch's dataset; these are optimization iterations, not epochs.
 - Across epochs, the dataset is regenerated using the model produced by the previous epoch.
-- Checkpointing is scoped to a single run/epoch directory (`checkpoints_parent_dir/checkpoints`), and checkpoint internals are treated as implementation-private resume state.
+- Checkpointing is scoped to a single run/epoch directory, and checkpoint internals are treated as implementation-private resume state.
 
 ## Training Interface
 
 Each training sample provides:
 
-1. `input_ids`: token IDs.
-2. `labels`: token IDs for trainable positions and `-100` for masked positions; the first tool-response token may use EOS depending on generation termination handling in SgLang.
-3. `attention_mask`: padding mask.
-4. `advantages`: normalized token-level advantage values aligned with `input_ids`.
+1. Input token identifiers for the prompt and generated trajectory.
+2. Target token identifiers for trainable positions, with masked positions ignored by the loss.
+3. A padding mask indicating which token positions are real sequence content.
+4. Normalized token-level advantage values aligned with the input sequence.
 
 ## Implementation Details
 

@@ -30,7 +30,7 @@
 \maketitle
 
 \begin{abstract}
-We present \ours, a reference-free framework for fine-grained credit assignment in agentic large language model training. Rather than assigning a single scalar reward to an entire reasoning trajectory, \ours\ constructs a rollout tree, estimates segment-level contribution and uncertainty from mixed-success leaves, and converts these estimates into dense token-level training signals. The method is designed for mathematical reasoning agents whose trajectories may interleave natural-language reasoning, fenced Python tool calls, tool responses, and final boxed answers. Compared with methods such as TEMPO that exploit shared prefixes among sampled trajectories, \ours\ actively creates new continuations through guided token-level branching, concentrating exploration at uncertain and model-plausible decision points. Compared with TreeRPO-style tree credit assignment based on empirical outcome comparisons, \ours\ uses a statistically grounded maximum-a-posteriori posterior model that estimates both signed segment contribution and uncertainty before producing token-level advantages. Experiments use a resource-efficient split pipeline that rolls out from the base policy, generates advantage-weighted training data, fine-tunes LoRA adapters, and validates per-epoch checkpoints, comparing \ours\ against base models, trajectory-level GRPO-style training, and tree-structured ablations across tool and no-tool mathematical reasoning settings.
+We present \ours, a reference-free framework for fine-grained credit assignment in agentic large language model training. Rather than assigning a single scalar reward to an entire reasoning trajectory, \ours\ constructs a rollout tree, estimates segment-level contribution and uncertainty from mixed-success leaves, and converts these estimates into dense token-level training signals. The method is designed for mathematical reasoning agents whose trajectories may interleave natural-language reasoning, fenced Python tool calls, tool responses, and final boxed answers. Compared with methods such as TEMPO that exploit shared prefixes among sampled trajectories, \ours\ actively creates new continuations through guided token-level branching, concentrating exploration at uncertain and model-plausible decision points. Compared with TreeRPO-style tree credit assignment based on empirical outcome comparisons, \ours\ uses a statistically grounded maximum-a-posteriori posterior model that estimates both signed segment contribution and uncertainty before producing token-level advantages. Experiments use a resource-efficient split pipeline that rolls out from the base policy, generates advantage-weighted training data, fine-tunes LoRA adapters, and validates per-epoch checkpoints. Current results show modest but consistent validation gains for Qwen2.5-7B in both tool and no-tool settings, while also revealing sensitivity to learning rate, adapter rank, and validation protocol.
 \end{abstract}
 
 \section{Introduction}
@@ -47,7 +47,7 @@ Our contributions are:
     \item We formulate fine-grained credit assignment as posterior inference over signed segment contributions in a trajectory tree.
     \item We introduce a guided branching policy that prioritizes uncertain segments and branching nodes while discouraging over-fragmentation and over-concentration.
     \item We describe a practical training pipeline that converts rollout trees into non-redundant training trajectories with token-level advantages.
-    \item We provide an experimental framework spanning tool and no-tool reasoning, in-distribution and out-of-distribution mathematical benchmarks, and ablations that separate branching strategy from credit estimation.
+    \item We report split-pipeline LoRA experiments showing small positive validation gains in Qwen2.5-7B tool and no-tool settings, together with negative results that identify instability at overly aggressive learning rates.
 \end{itemize}
 
 \begin{figure*}[t]
@@ -189,15 +189,16 @@ For segment splitting, the structural penalty increases with the shorter side of
 \subsection{From Posterior Scores to Training Advantages}
 After tree construction, each segment receives an unnormalized signed score proportional to $m_i / \exp(u_i)$. The methodology notes propose an additional length-aware rescaling to reduce volatility from very short reasoning spans. The generated training samples then attach token-level advantage values aligned with the input sequence.
 
-The downstream Python training code consumes four aligned tensors per sample: \texttt{input\_ids}, \texttt{labels}, \texttt{attention\_mask}, and \texttt{advantages}. The loss is an advantage-weighted causal LM objective over supervised positions,
+The downstream training code consumes aligned token sequences, supervised target tokens, attention masks, token-level advantages, and old token log probabilities. The loss is a clipped policy-ratio surrogate over supervised positions,
 \begin{equation}
-\mathcal{L}_{\text{train}} = \frac{1}{|\mathcal{S}|}
+\mathcal{L}_{\text{train}} = -\frac{1}{|\mathcal{S}|}
 \sum_{t \in \mathcal{S}}
-\operatorname{clip}(A_t,-c,c)
-\cdot
-\operatorname{CE}\big(p_\theta(\cdot \mid x_{<t}), x_t\big),
+\min\left(
+\rho_t \tilde{A}_t,
+\operatorname{clip}(\rho_t,1-\epsilon,1+\epsilon)\tilde{A}_t
+\right),
 \end{equation}
-where $\mathcal{S}$ denotes unmasked token positions and the current implementation clips $A_t$ to $[-3,3]$ before weighting the token cross-entropy. This is the implemented optimization interface for injecting segment-level credit into model updates.
+where $\mathcal{S}$ denotes supervised token positions, $\rho_t$ is the ratio between the current token probability and the stored old token probability, and $\tilde{A}_t$ is the token advantage clipped to $[-3,3]$. This is the implemented optimization interface for injecting segment-level credit into model updates while avoiding the unbounded negative-advantage objective that arises from direct advantage-weighted cross entropy.
 
 \subsection{Training-Set Construction}
 Because many tree leaves share prefixes, naively flattening all leaves would over-train shared segments. We therefore use a greedy de-duplication policy.
@@ -222,10 +223,12 @@ We consider three primary comparison points.
 We also separate two ablation axes that are explicitly encoded in configs and scripts.
 \begin{itemize}
     \item \textbf{TEMPO-style branching ablation:} switch the branching policy from guided branching to spontaneous divergence-point branching while keeping posterior-based credit assignment.
-    \item \textbf{TreeRPO ablation:} keep guided branching but replace posterior-based segment advantages with a win-rate heuristic.
+    \item \textbf{TreeRPO-style credit ablation:} keep guided branching but replace posterior-based segment advantages with bottom-up child-group outcome comparisons. For each branching group, terminal correctness is backed up into child subtree values; groups with negligible value spread are filtered; surviving children receive normalized relative advantages.
+    \item \textbf{TreeRL-style branching ablation:} keep posterior-based credit assignment but select guided branch points by model entropy rather than our full branching score.
+    \item \textbf{TreeRL-style credit ablation:} keep guided branching but replace posterior-based segment advantages with a local--global value-difference estimator, combining a segment's improvement over its parent with its improvement over the root.
 \end{itemize}
 
-In our implementation, these ablations are not merely renamed conditions: the TEMPO ablation changes \texttt{branching\_policy}, while the TreeRPO ablation changes \texttt{advantage\_calculation\_policy}. This distinction is important because it cleanly separates exploration structure from credit estimation.
+In our implementation, these ablations are not merely renamed conditions: the TEMPO and TreeRL-branching ablations change the exploration rule, while the TreeRPO-style and TreeRL-credit ablations change the advantage-estimation rule. This distinction is important because it cleanly separates exploration structure from credit estimation.
 
 \section{Experimental Setup}
 \subsection{Models}
@@ -244,11 +247,11 @@ For the main tables, tool-enabled and no-tool variants of the same backbone are 
 \subsection{Datasets}
 Training and validation are built from DeepMath, MATH, and NuminaMath.
 \begin{itemize}
-    \item \texttt{hybrid\_train.sqlite}: 5{,}000 samples per dataset, interleaved across the three in-distribution datasets.
-    \item \texttt{hybrid\_val.sqlite}: 1{,}000 validation samples per dataset drawn from disjoint index ranges after the training slice.
+    \item The training JSONL file contains 5{,}000 samples per dataset, interleaved across the three in-distribution datasets.
+    \item The validation JSONL file contains 1{,}000 validation samples per dataset drawn from disjoint index ranges after the training slice.
 \end{itemize}
 
-We also construct an aggregated held-out evaluation database from six datasets in this order: DeepMath, MATH, NuminaMath, AMC2023, GaoKao Math 2024, and CollegeMath. For datasets with more than 1{,}000 test rows, 1{,}000 are sampled with seed 42; for DeepMath, which lacks a dedicated test split in the current pipeline, evaluation rows are drawn from the training split after clearing the reserved training and validation examples.
+We also construct an aggregated held-out evaluation JSONL file from six datasets in this order: DeepMath, MATH, NuminaMath, AMC2023, GaoKao Math 2024, and CollegeMath. For datasets with more than 1{,}000 test rows, 1{,}000 are sampled with seed 42; for DeepMath, which lacks a dedicated test split in the current pipeline, evaluation rows are drawn from the training split after clearing the reserved training and validation examples.
 
 
 \subsection{Training and Evaluation Protocol}
@@ -260,106 +263,120 @@ The training protocol uses the following recurring settings:
 \begin{itemize}
     \item 5--10 one-shot training epochs, depending on the run budget.
     \item cumulative average-absolute-advantage cutoff of $0.5$ for training-set retention.
-    \item 3 optimizer iterations per training run.
+    \item time-budgeted training within each epoch, with summaries reporting both samples trained and cumulative dataset-pass coverage.
     \item LoRA-based fine-tuning for the primary experiments.
     \item fixed rollout temperature $0.7$.
 \end{itemize}
 
 The primary evaluation metric is pass@1 accuracy. We report aggregate accuracy together with per-dataset accuracy, and include confidence intervals when multiple independent runs are available.
 
-\section{Results}
-This section contains result placeholders to be replaced with final measured statistics. All non-result sections describe the implemented method and evaluation protocol.
 
-\subsection{Main Comparison}
-Table~\ref{tab:main-results} is structured to compare base, GRPO, and \ours\ across datasets, while grouping rows by model-condition family.
+\section{Results}
+This section reports completed measurements available at submission time. Because the experiments use a split one-shot protocol and several longer pipelines are still queued, we emphasize conservative conclusions: the current evidence supports modest validation improvements and useful stability diagnostics, but not yet a definitive claim of broad benchmark superiority.
+
+\subsection{Validation Accuracy Trends}
+Table~\ref{tab:validation-results} summarizes completed validation runs. ``Best'' is the best validated trained checkpoint, and gains are measured against the same run's base checkpoint. All listed training runs use single-GPU LoRA fine-tuning.
+
+\begin{table*}[t]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llcccccc}
+\hline
+Model and condition & Method & Rank & LR & Epochs validated & Base & Best & Gain \\
+\hline
+Qwen2.5-7B no-tool & GRPO & 32 & $10^{-6}$ & 5 & 0.6691 & 0.6853 & +0.0162 \\
+Qwen2.5-7B no-tool & \ours & 32 & $10^{-6}$ & 10 & 0.6761 & 0.6931 & +0.0170 \\
+Qwen2.5-7B + tool & GRPO & 32 & $10^{-6}$ & 5 & 0.6412 & 0.6580 & +0.0167 \\
+Qwen2.5-7B + tool & \ours & 32 & $10^{-6}$ & 5 & 0.6349 & 0.6569 & +0.0219 \\
+Qwen3-4B no-tool & GRPO & 16 & $10^{-6}$ & 5 & 0.7061 & 0.7203 & +0.0143 \\
+Qwen3-4B no-tool & GRPO & 32 & $10^{-6}$ & 5 & 0.7141 & 0.7251 & +0.0110 \\
+Mistral-7B no-tool & GRPO & 32 & $10^{-6}$ & 5 & 0.2056 & 0.2345 & +0.0289 \\
+\hline
+\end{tabular}%
+}
+\caption{Completed validation results. Values are pass@1 averages on the validation mixture. The Qwen3-4B and Mistral rows are preliminary model-family probes; the main controlled comparison is Qwen2.5-7B at LoRA rank 32 and learning rate $10^{-6}$.}
+\label{tab:validation-results}
+\end{table*}
+
+For Qwen2.5-7B, both GRPO and \ours\ improve over their base checkpoints in the no-tool and tool settings. The magnitude is modest---roughly 1.6--2.2 percentage points in the best validated checkpoint---and the trends are not monotonic across epochs. We therefore treat these as evidence that the split pipeline can produce useful training signal, not as evidence that the method has saturated or consistently dominates all baselines.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{images/qwen25_notool_epoch_improvement.pdf}
+\caption{Validation accuracy improvement over the base checkpoint for Qwen2.5-7B in the no-tool setting. Both lines use LoRA rank 32 and learning rate $10^{-6}$; the y-axis reports percentage-point change relative to each method's epoch-0 validation accuracy.}
+\label{fig:qwen25-notool-improvement}
+\end{figure}
+
+\subsection{Held-Out Serious Tests}
+Table~\ref{tab:heldout-serious} reports completed held-out serious tests on a broader six-dataset mixture than the validation curves. These results are more conservative than the validation table: they confirm that the pipeline produces usable checkpoints, but they do not yet show a uniform TreeMAPPO advantage across settings.
 
 \begin{table*}[t]
 \centering
 \resizebox{\textwidth}{!}{%
 \begin{tabular}{llccccccc}
 \hline
-Model family & Setup & DeepMath & MATH & NuminaMath & AMC2023 & GaoKao Math 2024 & CollegeMath & Avg. \\
+Model and condition & Method & DeepMath & MATH & NuminaMath & AMC2023 & GaoKao Math 2024 & CollegeMath & Avg. \\
 \hline
-Qwen2.5-7B + tool & Base & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
-Qwen2.5-7B + tool & GRPO & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
-Qwen2.5-7B + tool & \ours & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
-\hline
-Qwen2.5-7B no-tool & Base & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
-Qwen2.5-7B no-tool & GRPO & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
-Qwen2.5-7B no-tool & \ours & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
-\hline
-Qwen3-4B + tool & Base & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
-Qwen3-4B + tool & GRPO & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
-Qwen3-4B + tool & \ours & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
-\hline
-Qwen3-4B no-tool & Base & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
-Qwen3-4B no-tool & GRPO & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
-Qwen3-4B no-tool & \ours & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
-\hline
-Gemma-3-4B-IT no-tool & Base & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
-Gemma-3-4B-IT no-tool & GRPO & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
-Gemma-3-4B-IT no-tool & \ours & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
-\hline
-Llama-3.1 no-tool & Base & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
-Llama-3.1 no-tool & GRPO & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
-Llama-3.1 no-tool & \ours & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
-\hline
-Mistral-7B no-tool & Base & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
-Mistral-7B no-tool & GRPO & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
-Mistral-7B no-tool & \ours & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
+Qwen2.5-7B no-tool & Base & 0.614 & 0.737 & 0.640 & 0.500 & 0.654 & 0.753 & 0.650 \\
+Qwen2.5-7B no-tool & \ours, epoch 10 & 0.623 & 0.737 & 0.630 & 0.500 & 0.577 & 0.759 & 0.638 \\
+Qwen2.5-7B no-tool & \ours\ positive-only, epoch 5 & 0.626 & 0.744 & 0.630 & 0.650 & 0.577 & 0.853 & 0.680 \\
+Qwen2.5-7B + tool & \ours\ positive-only, epoch 2 & 0.564 & 0.704 & 0.590 & 0.500 & 0.538 & 0.774 & 0.612 \\
+Qwen3-4B + tool & GRPO, epoch 9 & 0.654 & 0.761 & 0.592 & 0.568 & 0.609 & 0.782 & 0.661 \\
+Qwen3-4B + tool & \ours, epoch 1 & 0.631 & 0.750 & 0.611 & 0.590 & 0.522 & 0.784 & 0.648 \\
 \hline
 \end{tabular}%
 }
-\caption{Main comparison across model families and datasets. Replace placeholders with measured pass@1 mean $\pm$ confidence interval.}
-\label{tab:main-results}
+\caption{Completed held-out serious tests at LoRA rank 32 and learning rate $10^{-6}$. The no-tool Qwen2.5-7B row for \ours\ is mixed relative to its validation gain, while positive-only filtering is an ablation rather than the main method. In the completed Qwen3-4B tool comparison, GRPO currently has higher aggregate held-out accuracy than \ours.}
+\label{tab:heldout-serious}
 \end{table*}
 
 \subsection{Ablation Study}
-The main ablation table is designed around the conditions explicitly implemented for Qwen2.5-7B with tool use: Base, GRPO, TEMPO-style spontaneous branching, TreeRPO-style heuristic credit assignment, and \ours.
+The main ablation plan separates branching policy from credit estimation. The TEMPO-style condition changes the branch source to spontaneous shared-prefix divergence. The TreeRPO-style condition changes only the segment-credit estimator to child-group win-rate comparison. The two TreeRL-style conditions separately test entropy-guided branching and local--global value-difference credit. Only the earlier TreeRPO-style no-tool run is complete so far; TEMPO, TreeRL-style, and branch-budget runs remain queued.
 
-\begin{table*}[t]
+\begin{table}[t]
 \centering
-\resizebox{\textwidth}{!}{%
-\begin{tabular}{llccccccc}
+\begin{tabular}{lccc}
 \hline
-Model family & Setup & DeepMath & MATH & NuminaMath & AMC2023 & GaoKao Math 2024 & CollegeMath & Avg. \\
+Qwen2.5-7B no-tool & Base & Best & Gain \\
 \hline
-Qwen2.5-7B + tool & Base & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
-Qwen2.5-7B + tool & GRPO & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
-Qwen2.5-7B + tool & TEMPO-style & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
-Qwen2.5-7B + tool & TreeRPO-style & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
-Qwen2.5-7B + tool & \ours & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder & \placeholder \\
+GRPO & 0.6691 & 0.6853 & +0.0162 \\
+TreeRPO-style credit & 0.6737 & 0.6814 & +0.0077 \\
+TreeRL-style branching & -- & -- & -- \\
+TreeRL-style credit & -- & -- & -- \\
+\ours & 0.6761 & 0.6931 & +0.0170 \\
 \hline
-\end{tabular}%
-}
-\caption{Ablation framework. The TEMPO-style condition changes the branching policy; the TreeRPO-style condition changes the segment-credit estimator.}
+\end{tabular}
+\caption{Partial no-tool ablation at LoRA rank 32 and learning rate $10^{-6}$. The listed TreeRPO-style result is from the earlier win-rate-credit implementation; reruns will use child-group outcome comparison to better match the TreeRPO ablation definition.}
 \label{tab:ablation-results}
-\end{table*}
+\end{table}
+
+\subsection{Stability Diagnostics}
+Several completed runs are negative results that shape the current claims. Qwen2.5-7B \ours\ at LoRA rank 32 with learning rate $5\times10^{-5}$ collapses from a base validation average of 0.6580 to a best trained checkpoint of only 0.2823. Qwen3-4B GRPO at the same high learning rate also degrades sharply, with trained checkpoints below the 0.7055 base. Mistral-7B at rank 16 and learning rate $5\times10^{-5}$ shows an initial epoch-1 gain but then collapses to near-zero validation accuracy. These outcomes motivate the low learning rate used in Table~\ref{tab:validation-results} and support presenting adapter-rank and learning-rate sensitivity as central empirical findings rather than implementation details.
 
 \subsection{Branching-Budget Sensitivity}
-Our experimental plan already includes 8-, 16-, and 32-trajectory variants for the Qwen2.5-7B tool setting. This enables a direct study of how tree size affects downstream performance.
+Our experimental plan includes 8-, 16-, and 32-trajectory variants for the Qwen2.5-7B no-tool setting. These runs are queued and will be used to test whether downstream performance improves with larger rollout trees.
 
 \begin{figure}[t]
 \centering
 \fbox{\parbox{0.95\columnwidth}{\centering
 \vspace{0.4em}
-Placeholder line chart\\
+Queued branch-budget study\\
 \small x-axis: total trajectories / leaves in tree (8, 16, 32)\\
 \small y-axis: downstream pass@1 on validation or aggregated test\\
-\small show mean and confidence interval bands\\
+\small show mean and confidence interval bands when repeated runs are available\\
 \vspace{0.4em}
 }}
-\caption{Branching-budget sensitivity. Replace this placeholder with a real line chart once results are available.}
+\caption{Branching-budget sensitivity study planned for queued Qwen2.5-7B no-tool jobs.}
 \label{fig:branch-budget}
 \end{figure}
 
 \section{Discussion}
-The main conceptual benefit of \ours\ is that it turns sparse trajectory-level outcomes into dense supervision without requiring reference solutions or manually annotated intermediate steps. The tree structure also allows uncertainty to be localized: early segments supported by many mixed descendants can be recognized as uncertain, whereas a split that sharply changes success rates can receive stronger credit or blame.
+The main conceptual benefit of \ours\ is that it turns sparse trajectory-level outcomes into dense supervision without requiring reference solutions or manually annotated intermediate steps. The completed validation results show that this signal can improve Qwen2.5-7B adapters in both tool and no-tool settings, with gains comparable to or slightly larger than the GRPO-style baseline under the low-learning-rate rank-32 configuration. The held-out serious tests are more mixed, however: the standard no-tool \ours\ checkpoint lowers the aggregate across six datasets, the positive-only ablation is not consistently strong, and the completed Qwen3-4B tool comparison favors GRPO on aggregate. This gap between validation and held-out test performance is important evidence that final claims should rely on broader evaluation, not only per-epoch validation curves.
 
 Several practical design choices are worth emphasizing.
 \begin{itemize}
     \item Branch selection is not based on posterior uncertainty alone; it also depends on the model's alternative-token probability mass, which makes branching more realistic and less likely to chase implausible continuations.
-    \item The training loss is an advantage-weighted language-model loss rather than a clipped PPO-ratio objective. This choice keeps the optimization interface simple while preserving the central contribution: tree-based posterior credit assignment.
+    \item The training loss uses a clipped policy-ratio surrogate with token-level advantages produced by the training-set generator. This keeps the optimization interface close to standard policy-gradient practice while preserving the central contribution: tree-based posterior credit assignment.
     \item Tool-enabled and no-tool settings are analyzed separately because the credit-assignment problem differs materially once trajectories can call Python and recover from arithmetic mistakes.
 \end{itemize}
 
@@ -368,13 +385,15 @@ The present system has several important limitations.
 \begin{itemize}
     \item Tree construction requires more inference than flat rollout collection, so the method trades additional sampling cost for denser supervision.
     \item The main experiments use a split one-shot pipeline rather than fully online interleaved rollout and training. This is a practical choice driven by compute limits, queue latency, and debugging efficiency; it means the reported experiments primarily test the quality of the generated credit-assignment data, not the full closed-loop dynamics of repeated policy improvement.
+    \item Current gains are modest and validation trends are noisy. The strongest completed Qwen2.5-7B validation gains are around two percentage points, and the held-out serious test for the no-tool \ours\ checkpoint is mixed.
+    \item Several longer and more controlled experiments are still queued, including Qwen3-4B tool training, Qwen2.5-7B branch-budget sweeps, TEMPO-style ablations, and extended Qwen3-4B no-tool validation. These results are needed before making broad scaling claims.
     \item The MAP credit model intentionally uses a simple additive segment-contribution assumption. This makes inference tractable and interpretable, but it cannot represent all higher-order interactions among distant reasoning segments.
     \item Correctness is judged from extracted final answers, so the approach inherits the limitations of answer extraction and exact-answer comparison on mathematical benchmarks.
     \item The tool environment is deliberately lightweight. Richer agent tools may require additional safety checks, state tracking, and branch-selection criteria.
 \end{itemize}
 
 \section{Conclusion}
-We presented \ours, a trajectory-tree method for fine-grained credit assignment in agentic LLM training. The core idea is to branch reasoning trajectories at token granularity, infer segment-level contribution and uncertainty from mixed-success descendants, and convert those estimates into training signals for subsequent optimization. The implementation supports the central methodological ingredients, several ablations, tool/no-tool variants, and branch-budget experiments. Together, these components provide a practical route from sparse terminal rewards to localized training signal for long-form reasoning agents.
+We presented \ours, a trajectory-tree method for fine-grained credit assignment in agentic LLM training. The core idea is to branch reasoning trajectories at token granularity, infer segment-level contribution and uncertainty from mixed-success descendants, and convert those estimates into training signals for subsequent optimization. Completed split-pipeline experiments show modest Qwen2.5-7B validation gains in tool and no-tool settings and identify important stability constraints for LoRA rank and learning rate. The current evidence supports \ours\ as a practical mechanism for producing localized training signal from sparse terminal rewards, but also shows that its advantage over GRPO is not yet uniform across held-out tests. Full online training, replicated comparisons, and broader held-out confirmation remain necessary next steps.
 
 \bibliography{aaai2026}
 

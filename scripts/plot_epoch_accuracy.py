@@ -19,6 +19,12 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=Path("images/qwen25_notool_epoch_accuracy.pdf"))
     parser.add_argument("--scenario", default="notool")
     parser.add_argument("--model", default="qwen25")
+    parser.add_argument(
+        "--metric",
+        choices=("accuracy", "improvement"),
+        default="accuracy",
+        help="Plot absolute validation accuracy or improvement over each method's epoch-0 baseline.",
+    )
     args = parser.parse_args()
 
     rows = [
@@ -47,15 +53,26 @@ def main() -> None:
     markers = ["o", "s", "^", "D"]
     for index, (label, points) in enumerate(sorted(series.items())):
         points.sort()
+        baseline = next((accuracy for epoch, accuracy in points if epoch == 0), None)
+        if args.metric == "improvement" and baseline is None:
+            raise SystemExit(f"Series {label!r} has no epoch-0 baseline for improvement plot")
         xs = [epoch for epoch, _ in points]
-        ys = [accuracy * 100.0 for _, accuracy in points]
+        if args.metric == "accuracy":
+            ys = [accuracy * 100.0 for _, accuracy in points]
+        else:
+            ys = [(accuracy - baseline) * 100.0 for _, accuracy in points]
         ax.plot(xs, ys, marker=markers[index % len(markers)], linewidth=1.8, markersize=4.5, label=label)
         best_index = max(range(len(points)), key=lambda i: points[i][1])
         ax.scatter([xs[best_index]], [ys[best_index]], s=52, facecolors="none", edgecolors="black", linewidths=1.0, zorder=4)
 
     ax.set_xlabel("Training epoch")
-    ax.set_ylabel("Validation accuracy (%)")
-    ax.set_title("Qwen2.5-7B no-tool validation accuracy")
+    if args.metric == "accuracy":
+        ax.set_ylabel("Validation accuracy (%)")
+        ax.set_title("Qwen2.5-7B no-tool validation accuracy")
+    else:
+        ax.axhline(0.0, color="black", linewidth=0.8, alpha=0.6)
+        ax.set_ylabel("Validation accuracy improvement (points)")
+        ax.set_title("Qwen2.5-7B no-tool validation improvement")
     ax.grid(axis="y", alpha=0.25, linewidth=0.7)
     ax.legend(frameon=False, loc="best")
     ax.set_xticks(sorted({int(row["epoch"]) for row in rows}))
