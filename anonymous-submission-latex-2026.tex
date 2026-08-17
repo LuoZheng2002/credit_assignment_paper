@@ -30,7 +30,7 @@
 \maketitle
 
 \begin{abstract}
-We present \ours, a reference-free framework for fine-grained credit assignment in agentic large language model training. Rather than assigning a single scalar reward to an entire reasoning trajectory, \ours\ constructs a rollout tree, estimates segment-level contribution and uncertainty from mixed-success leaves, and converts these estimates into dense token-level training signals. The method is designed for mathematical reasoning agents whose trajectories may interleave natural-language reasoning, fenced Python tool calls, tool responses, and final boxed answers. Compared with methods such as TEMPO that exploit shared prefixes among sampled trajectories, \ours\ actively creates new continuations through guided token-level branching, concentrating exploration at uncertain and model-plausible decision points. Compared with TreeRPO-style tree credit assignment based on empirical outcome comparisons, \ours\ uses a statistically grounded maximum-a-posteriori posterior model that estimates both signed segment contribution and uncertainty before producing token-level advantages. Experiments use a resource-efficient split pipeline that rolls out from the base policy, generates advantage-weighted training data, fine-tunes LoRA adapters, and validates per-epoch checkpoints. Current results show modest but consistent validation gains for Qwen2.5-7B in both tool and no-tool settings, while also revealing sensitivity to learning rate, adapter rank, and validation protocol.
+We present \ours, a reference-free framework for fine-grained credit assignment in agentic large language model training. Rather than assigning a single scalar reward to an entire reasoning trajectory, \ours\ constructs a rollout tree, estimates segment-level contribution and uncertainty from mixed-success leaves, and converts these estimates into dense token-level training signals. The method is designed for mathematical reasoning agents whose trajectories may interleave natural-language reasoning, fenced Python tool calls, tool responses, and final boxed answers. Compared with methods such as TEMPO that exploit shared prefixes among sampled trajectories, \ours\ actively creates new continuations through guided token-level branching, concentrating exploration at structurally useful and model-plausible decision points. Compared with TreeRPO-style tree credit assignment based on empirical outcome comparisons, \ours\ uses a statistically grounded maximum-a-posteriori posterior model that estimates both signed segment contribution and uncertainty before producing token-level advantages. Experiments use a resource-efficient split pipeline that rolls out from the base policy, generates advantage-weighted training data, fine-tunes LoRA adapters, and validates per-epoch checkpoints. Current results show modest but consistent validation gains for Qwen2.5-7B in both tool and no-tool settings, while also revealing sensitivity to learning rate, adapter rank, and validation protocol.
 \end{abstract}
 
 \section{Introduction}
@@ -45,7 +45,7 @@ Our implementation uses a lightweight tool-calling protocol: the model receives 
 Our contributions are:
 \begin{itemize}
     \item We formulate fine-grained credit assignment as posterior inference over signed segment contributions in a trajectory tree.
-    \item We introduce a guided branching policy that prioritizes uncertain segments and branching nodes while discouraging over-fragmentation and over-concentration.
+    \item We introduce a guided branching policy that prioritizes model-plausible token-level alternatives while discouraging over-fragmentation and over-concentration.
     \item We describe a practical training pipeline that converts rollout trees into non-redundant training trajectories with token-level advantages.
     \item We report split-pipeline LoRA experiments showing small positive validation gains in Qwen2.5-7B tool and no-tool settings, together with negative results that identify instability at overly aggressive learning rates.
 \end{itemize}
@@ -65,7 +65,7 @@ Reinforcement learning with verifiable rewards has become a standard recipe for 
 A complementary line of work makes supervision denser by judging intermediate reasoning steps. Let’s Verify Step by Step showed that process supervision can outperform outcome-only supervision on mathematical reasoning by training process reward models from step-level human labels \cite{lightman2023letsverify}. This line establishes the value of fine-grained credit, but it changes the supervision regime: it depends on annotated intermediate labels, learned verifiers, or additional reward-model infrastructure. \ours\ instead keeps the outcome-only setting and infers local credit from the structure of sampled rollouts. The distinction is important methodologically: our goal is not to build a stronger verifier, but to convert sparse terminal correctness into localized training signals without step-level references.
 
 \paragraph{Implicit tree and shared-prefix methods.}
-TEMPO \cite{tempo2025} converts a group of sampled responses into a prefix tree and adds branch-gated temporal-difference corrections on top of a GRPO-style training loop. Its main appeal is that it preserves a relatively simple rollout interface while extracting token-level signal where natural branching occurs. Our method differs in that we do not rely on incidental prefix overlap alone; instead, we explicitly create new branches at selected token positions, which provides direct control over branching density and lets exploration be driven by posterior uncertainty.
+TEMPO \cite{tempo2025} converts a group of sampled responses into a prefix tree and adds branch-gated temporal-difference corrections on top of a GRPO-style training loop. Its main appeal is that it preserves a relatively simple rollout interface while extracting token-level signal where natural branching occurs. Our method differs in that we do not rely on incidental prefix overlap alone; instead, we explicitly create new branches at selected token positions, which provides direct control over branching density using rollout structure and model-side alternative-token probabilities.
 
 \paragraph{Explicit tree sampling and tree-aware advantages.}
 TreeRPO \cite{treerpo2025} and TreePO \cite{treepo2025} both pursue explicit tree-structured sampling to obtain denser supervision. TreeRPO estimates step-level reward expectations via tree sampling and forms step-level comparison groups without a separate reward model. TreePO emphasizes systems efficiency, shared-prefix reuse, and subgroup-relative advantages over segment-level trees. Our method is closest in spirit to this line, but differs in two important respects: first, we branch at arbitrary token positions rather than imposing fixed step or segment partitions; second, we infer segment contribution with a probabilistic MAP model that explicitly represents uncertainty, rather than relying only on win-rate or subgroup heuristics.
@@ -151,29 +151,9 @@ $\varepsilon = 10^{-6}$,
 120 optimization iterations, and log-standard-deviation clamps in $[-4,2]$.
 Optimization is performed with gradient steps and backtracking line search, together with a numerically stable implementation of $\log \Phi$ for large negative margins.
 
-\subsection{Uncertainty-Aware Guided Branching}
-Posterior statistics are reused to decide where to branch next. The implementation first computes a signal-to-noise ratio for each segment,
-\begin{equation}
-r_i = \frac{m_i}{\exp(u_i) + \varepsilon},
-\end{equation}
-then standardizes these values across segments in the same tree,
-\begin{equation}
-\tilde{r}_i = \frac{r_i - \operatorname{mean}(r)}{\operatorname{std}(r)+\varepsilon},
-\end{equation}
-and maps them to a bounded uncertainty score,
-\begin{equation}
-s_i = \exp(-\alpha \tilde{r}_i^2), \quad \alpha = 1.
-\end{equation}
-Segments whose posterior signal is close to zero receive higher branching priority because they are more uncertain.
-
-For a branching node with parent score $s_p$ and child scores $s_{c_1},\dots,s_{c_b}$, the node score is
-\begin{equation}
-s_{\text{node}} = \frac{b s_p + \sum_{j=1}^{b} s_{c_j}}{2b}.
-\end{equation}
-
-The final implementation-level per-token branching score also includes a model-side alternative-token term derived from the stored top-$k$ logprob candidates. Concretely, for each candidate token position we multiply:
+\subsection{Guided Token-Level Branching}
+The current implementation chooses branch points before leaf judgments are available. Branching therefore relies on rollout structure and model-side token statistics rather than posterior uncertainty. For each candidate token position, the implementation multiplies:
 \begin{enumerate}
-    \item a segment or node uncertainty score,
     \item a structural penalty, and
     \item the relative probability of the best alternative token that differs from the already-sampled continuation.
 \end{enumerate}
@@ -185,6 +165,8 @@ For node expansion, the structural penalty is an exponential branching-factor pe
 \end{equation}
 with $k_{\text{node}}=0.35$ in the current implementation.
 For segment splitting, the structural penalty increases with the shorter side of the split relative to average trunk length, discouraging very short fragments.
+
+After a branch point and alternative token are selected, the strict guided-branching variant forces that selected token to be the first token of the new branch continuation. This makes the token-level branch explicit rather than merely restarting generation from the shared prefix and hoping that sampling chooses the intended alternative.
 
 \subsection{From Posterior Scores to Training Advantages}
 After tree construction, each segment receives an unnormalized signed score proportional to $m_i / \exp(u_i)$. The methodology notes propose an additional length-aware rescaling to reduce volatility from very short reasoning spans. The generated training samples then attach token-level advantage values aligned with the input sequence.
@@ -375,7 +357,7 @@ The main conceptual benefit of \ours\ is that it turns sparse trajectory-level o
 
 Several practical design choices are worth emphasizing.
 \begin{itemize}
-    \item Branch selection is not based on posterior uncertainty alone; it also depends on the model's alternative-token probability mass, which makes branching more realistic and less likely to chase implausible continuations.
+    \item Branch selection currently does not use posterior uncertainty; it uses structural penalties and the model's alternative-token probability mass, which makes branching realistic and less likely to chase implausible continuations.
     \item The training loss uses a clipped policy-ratio surrogate with token-level advantages produced by the training-set generator. This keeps the optimization interface close to standard policy-gradient practice while preserving the central contribution: tree-based posterior credit assignment.
     \item Tool-enabled and no-tool settings are analyzed separately because the credit-assignment problem differs materially once trajectories can call Python and recover from arithmetic mistakes.
 \end{itemize}
