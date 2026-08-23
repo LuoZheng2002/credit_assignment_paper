@@ -166,7 +166,7 @@ For node expansion, the structural penalty is an exponential branching-factor pe
 with $k_{\text{node}}=0.35$ in the current implementation.
 For segment splitting, the structural penalty increases with the shorter side of the split relative to average trunk length, discouraging very short fragments.
 
-After a branch point and alternative token are selected, the strict guided-branching variant forces that selected token to be the first token of the new branch continuation. This makes the token-level branch explicit rather than merely restarting generation from the shared prefix and hoping that sampling chooses the intended alternative.
+After a branch point and alternative token are selected, the current guided-branching implementation forces that selected token to be the first token of the new branch continuation. This makes the token-level branch explicit rather than merely restarting generation from the shared prefix and hoping that sampling chooses the intended alternative. We keep the non-forced version as an ablation, but use the forced-token version as the default because it better matches the intended token-level intervention.
 
 \subsection{From Posterior Scores to Training Advantages}
 After tree construction, each segment receives an unnormalized signed score proportional to $m_i / \exp(u_i)$. The methodology notes propose an additional length-aware rescaling to reduce volatility from very short reasoning spans. The generated training samples then attach token-level advantage values aligned with the input sequence.
@@ -313,7 +313,7 @@ Qwen3-4B + tool & \ours, epoch 1 & 0.631 & 0.750 & 0.611 & 0.590 & 0.522 & 0.784
 \end{table*}
 
 \subsection{Ablation Study}
-The main ablation plan separates branching policy from credit estimation. The TEMPO-style condition changes the branch source to spontaneous shared-prefix divergence. The TreeRPO-style condition changes only the segment-credit estimator to child-group win-rate comparison. The two TreeRL-style conditions separately test entropy-guided branching and local--global value-difference credit. Only the earlier TreeRPO-style no-tool run is complete so far; TEMPO, TreeRL-style, and branch-budget runs remain queued.
+The main ablation plan separates branching policy from credit estimation. The TEMPO-style condition changes the branch source to spontaneous shared-prefix divergence. The TreeRPO-style condition changes only the segment-credit estimator to child-group win-rate comparison. The two TreeRL-style conditions separately test entropy-guided branching and local--global value-difference credit. Guided-branching experiments use forced selected branch tokens by default; non-forced branching is retained only as a mechanism ablation. Only the earlier TreeRPO-style no-tool run is complete so far; TEMPO, TreeRL-style, and branch-budget runs remain queued.
 
 \begin{table}[t]
 \centering
