@@ -302,13 +302,12 @@ Model and condition & Method & DeepMath & MATH & NuminaMath & AMC2023 & GaoKao M
 Qwen2.5-7B no-tool & Base & 0.614 & 0.737 & 0.640 & 0.500 & 0.654 & 0.753 & 0.650 \\
 Qwen2.5-7B no-tool & \ours, epoch 10 & 0.623 & 0.737 & 0.630 & 0.500 & 0.577 & 0.759 & 0.638 \\
 Qwen2.5-7B no-tool & \ours\ positive-only, epoch 5 & 0.626 & 0.744 & 0.630 & 0.650 & 0.577 & 0.853 & 0.680 \\
-Qwen2.5-7B + tool & \ours\ positive-only, epoch 2 & 0.564 & 0.704 & 0.590 & 0.500 & 0.538 & 0.774 & 0.612 \\
 Qwen3-4B + tool & GRPO, epoch 9 & 0.654 & 0.761 & 0.592 & 0.568 & 0.609 & 0.782 & 0.661 \\
 Qwen3-4B + tool & \ours, epoch 1 & 0.631 & 0.750 & 0.611 & 0.590 & 0.522 & 0.784 & 0.648 \\
 \hline
 \end{tabular}%
 }
-\caption{Completed held-out serious tests at LoRA rank 32 and learning rate $10^{-6}$. The no-tool Qwen2.5-7B row for \ours\ is mixed relative to its validation gain, while positive-only filtering is an ablation rather than the main method. In the completed Qwen3-4B tool comparison, GRPO currently has higher aggregate held-out accuracy than \ours.}
+\caption{Completed held-out serious tests at LoRA rank 32 and learning rate $10^{-6}$. The no-tool Qwen2.5-7B row for \ours\ is mixed relative to its validation gain, while the positive-only row is a single low-priority ablation rather than the main method. In the completed Qwen3-4B tool comparison, GRPO currently has higher aggregate held-out accuracy than \ours.}
 \label{tab:heldout-serious}
 \end{table*}
 
@@ -353,7 +352,7 @@ Queued branch-budget study\\
 \end{figure}
 
 \section{Discussion}
-The main conceptual benefit of \ours\ is that it turns sparse trajectory-level outcomes into dense supervision without requiring reference solutions or manually annotated intermediate steps. The completed validation results show that this signal can improve Qwen2.5-7B adapters in both tool and no-tool settings, with gains comparable to or slightly larger than the GRPO-style baseline under the low-learning-rate rank-32 configuration. The held-out serious tests are more mixed, however: the standard no-tool \ours\ checkpoint lowers the aggregate across six datasets, the positive-only ablation is not consistently strong, and the completed Qwen3-4B tool comparison favors GRPO on aggregate. This gap between validation and held-out test performance is important evidence that final claims should rely on broader evaluation, not only per-epoch validation curves.
+The main conceptual benefit of \ours\ is that it turns sparse trajectory-level outcomes into dense supervision without requiring reference solutions or manually annotated intermediate steps. The completed validation results show that this signal can improve Qwen2.5-7B adapters in both tool and no-tool settings, with gains comparable to or slightly larger than the GRPO-style baseline under the low-learning-rate rank-32 configuration. The held-out serious tests are more mixed, however: the standard no-tool \ours\ checkpoint lowers the aggregate across six datasets, the single positive-only ablation should not be interpreted as the main method, and the completed Qwen3-4B tool comparison favors GRPO on aggregate. This gap between validation and held-out test performance is important evidence that final claims should rely on broader evaluation, not only per-epoch validation curves.
 
 Several practical design choices are worth emphasizing.
 \begin{itemize}
