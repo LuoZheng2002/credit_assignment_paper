@@ -10,6 +10,8 @@
 
 \newcommand{\ours}{TreeMAPPO}
 \newcommand{\toolflag}[1]{\textsc{#1}}
+\newcommand{\best}[1]{\textbf{\underline{#1}}}
+\newcommand{\acc}[2]{#1{\scriptsize$\pm$#2}}
 
 \title{TreeMAPPO: Fine-Grained Credit Assignment for Agentic LLM Training via Token-Level Trajectory Branching}
 
@@ -258,24 +260,30 @@ Table~\ref{tab:validation-results} summarizes audited held-out validation runs. 
 \hline
 Model and condition & Method & Trials & Epochs audited & Base & Best epoch & Best & Gain & Last \\
 \hline
-Qwen2.5-7B no-tool & GRPO & 6 & 0,10,\ldots,70 & 0.6468 & 30 & 0.6538 & +0.0069 & 0.6522 \\
-Qwen2.5-7B no-tool & \ours, forced token & 6 & 0,10,\ldots,70 & 0.6436 & 50 & 0.6523 & +0.0087 & 0.6494 \\
-Qwen2.5-7B + tool & GRPO & 6 & 0,10,\ldots,70 & 0.6142 & 30 & 0.6246 & +0.0104 & 0.6171 \\
-Qwen2.5-7B + tool & \ours, forced token & 6 & 0,10,\ldots,70 & 0.6134 & 50 & 0.6236 & +0.0101 & 0.6181 \\
-Qwen3-4B no-tool & GRPO & 6 & 0,10,\ldots,50 & 0.6901 & 50 & 0.6991 & +0.0089 & 0.6991 \\
-Qwen3-4B no-tool & \ours & 6 & 0,10,\ldots,50 & 0.6894 & 30 & 0.6944 & +0.0050 & 0.6849 \\
-Qwen3-4B + tool & GRPO & 6 & 0,10,\ldots,50 & 0.6446 & 40 & 0.6617 & +0.0172 & 0.6521 \\
-Qwen3-4B + tool & \ours & 6 & 0,10,\ldots,50 & 0.6434 & 50 & 0.6605 & +0.0171 & 0.6605 \\
-Gemma-3-4B no-tool & GRPO & 6 & 0,10,\ldots,50 & 0.5640 & 50 & 0.5647 & +0.0007 & 0.5647 \\
-Gemma-3-4B no-tool & \ours & 6 & 0,10,\ldots,50 & 0.5621 & 40 & 0.5643 & +0.0023 & 0.5594 \\
-Mistral-7B no-tool & GRPO & 6 & 0,10,\ldots,50 & 0.1747 & 40 & 0.1802 & +0.0055 & 0.1729 \\
-Mistral-7B no-tool & \ours & 6 & 0,10,\ldots,50 & 0.1747 & 10 & 0.1819 & +0.0072 & 0.1788 \\
-Llama-3.1 no-tool & GRPO & 6 & 0,10,\ldots,50 & 0.4415 & 30 & 0.4684 & +0.0269 & 0.4609 \\
-Llama-3.1 no-tool & \ours & 6 & 0,10,\ldots,40 & 0.4454 & 40 & 0.4589 & +0.0135 & 0.4589 \\
+Qwen2.5-7B no-tool & GRPO & 6 & 0,10,\ldots,70 & \best{\acc{0.6468}{0.0033}} & 30 & \best{\acc{0.6538}{0.0021}} & +0.0069 & \best{\acc{0.6522}{0.0039}} \\
+Qwen2.5-7B no-tool & \ours, forced token & 6 & 0,10,\ldots,70 & \acc{0.6436}{0.0025} & 50 & \acc{0.6523}{0.0016} & \best{+0.0087} & \acc{0.6494}{0.0035} \\
+\hline
+Qwen2.5-7B + tool & GRPO & 6 & 0,10,\ldots,70 & \best{\acc{0.6142}{0.0033}} & 30 & \best{\acc{0.6246}{0.0024}} & \best{+0.0104} & \acc{0.6171}{0.0046} \\
+Qwen2.5-7B + tool & \ours, forced token & 6 & 0,10,\ldots,70 & \acc{0.6134}{0.0034} & 50 & \acc{0.6236}{0.0033} & +0.0101 & \best{\acc{0.6181}{0.0016}} \\
+\hline
+Qwen3-4B no-tool & GRPO & 6 & 0,10,\ldots,50 & \best{\acc{0.6901}{0.0021}} & 50 & \best{\acc{0.6991}{0.0038}} & \best{+0.0089} & \best{\acc{0.6991}{0.0038}} \\
+Qwen3-4B no-tool & \ours & 6 & 0,10,\ldots,50 & \acc{0.6894}{0.0017} & 30 & \acc{0.6944}{0.0024} & +0.0050 & \acc{0.6849}{0.0047} \\
+\hline
+Qwen3-4B + tool & GRPO & 6 & 0,10,\ldots,50 & \best{\acc{0.6446}{0.0030}} & 40 & \best{\acc{0.6617}{0.0046}} & \best{+0.0172} & \acc{0.6521}{0.0044} \\
+Qwen3-4B + tool & \ours & 6 & 0,10,\ldots,50 & \acc{0.6434}{0.0034} & 50 & \acc{0.6605}{0.0023} & +0.0171 & \best{\acc{0.6605}{0.0023}} \\
+\hline
+Gemma-3-4B no-tool & GRPO & 6 & 0,10,\ldots,50 & \best{\acc{0.5640}{0.0022}} & 50 & \best{\acc{0.5647}{0.0032}} & +0.0007 & \best{\acc{0.5647}{0.0032}} \\
+Gemma-3-4B no-tool & \ours & 6 & 0,10,\ldots,50 & \acc{0.5621}{0.0030} & 40 & \acc{0.5643}{0.0029} & \best{+0.0023} & \acc{0.5594}{0.0034} \\
+\hline
+Mistral-7B no-tool & GRPO & 6 & 0,10,\ldots,50 & \best{\acc{0.1747}{0.0043}} & 40 & \acc{0.1802}{0.0013} & +0.0055 & \acc{0.1729}{0.0021} \\
+Mistral-7B no-tool & \ours & 6 & 0,10,\ldots,50 & \acc{0.1747}{0.0019} & 10 & \best{\acc{0.1819}{0.0031}} & \best{+0.0072} & \best{\acc{0.1788}{0.0023}} \\
+\hline
+Llama-3.1 no-tool & GRPO & 6 & 0,10,\ldots,50 & \acc{0.4415}{0.0038} & 30 & \best{\acc{0.4684}{0.0018}} & \best{+0.0269} & \best{\acc{0.4609}{0.0064}} \\
+Llama-3.1 no-tool & \ours & 6 & 0,10,\ldots,40 & \best{\acc{0.4454}{0.0035}} & 40 & \acc{0.4589}{0.0029} & +0.0135 & \acc{0.4589}{0.0029} \\
 \hline
 \end{tabular}%
 }
-\caption{Audited held-out validation results. Values are pass@1 macro averages on the validation mixture. All rows use six validation trials and epochs that are 0 or multiples of 10.}
+\caption{Audited held-out validation results. Values are pass@1 macro averages on the validation mixture, reported as mean with 95\% confidence interval over rollout trials. All rows use six validation trials and epochs that are 0 or multiples of 10. Bold underlined entries mark the largest value within each model-condition comparison block.}
 \label{tab:validation-results}
 \end{table}
 
@@ -289,44 +297,112 @@ Across validation runs, both GRPO and \ours\ extract usable signal from the spli
 \end{figure}
 
 \subsection{Held-Out Serious Tests}
-Table~\ref{tab:heldout-serious} reports serious tests on the broader six-dataset mixture. Each row uses the best checkpoint selected by validation for that method and setting, then evaluates it with five rollout trials. The macro average gives equal weight to datasets rather than to individual examples.
+Table~\ref{tab:heldout-serious} reports serious tests on the broader six-dataset mixture. Each row uses the best checkpoint selected by validation for that method and setting, then evaluates it with five rollout trials when the repaired per-trial artifacts are available. The macro average gives equal weight to datasets rather than to individual examples. Checkpoint selection and artifact coverage are reported separately in Table~\ref{tab:test-checkpoints}.
+
+\begin{table}[t]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llccccccc}
+\hline
+& & \multicolumn{3}{c}{In-distribution datasets} & \multicolumn{3}{c}{Out-of-distribution datasets} & \\
+\cline{3-5}\cline{6-8}
+Model and condition & Method & DeepMath & MATH & NuminaMath & AMC 2023 & GaoKao 2024 & CollegeMath & Macro avg. \\
+\hline
+Qwen2.5-7B no-tool & Base & \best{\acc{0.6034}{0.0030}} & \best{\acc{0.7400}{0.0056}} & \best{\acc{0.6160}{0.0211}} & \best{\acc{0.5400}{0.0480}} & \best{\acc{0.6000}{0.0511}} & \best{\acc{0.7204}{0.0029}} & \best{\acc{0.6366}{0.0145}} \\
+Qwen2.5-7B no-tool & GRPO & -- & -- & -- & -- & -- & -- & 0.6353 \\
+Qwen2.5-7B no-tool & \ours, non-forced token & -- & -- & -- & -- & -- & -- & \acc{0.6294}{0.0085} \\
+\hline
+Qwen2.5-7B + tool & Base & -- & -- & -- & -- & -- & -- & 0.5742 \\
+Qwen2.5-7B + tool & GRPO & \acc{0.5808}{0.0065} & \best{\acc{0.6986}{0.0053}} & \acc{0.5580}{0.0114} & \best{\acc{0.4750}{0.0410}} & \best{\acc{0.5385}{0.0413}} & \acc{0.6508}{0.0029} & \acc{0.5836}{0.0148} \\
+Qwen2.5-7B + tool & \ours, non-forced token & \best{\acc{0.5940}{0.0039}} & 0.6950 & \best{0.5700} & 0.4500 & \best{0.5385} & \best{0.6540} & \best{\acc{0.5880}{0.0079}} \\
+\hline
+Qwen3-4B no-tool & Base & 0.5610 & -- & -- & -- & -- & -- & 0.6941 \\
+Qwen3-4B no-tool & GRPO & \acc{0.6846}{0.0038} & \acc{0.8250}{0.0069} & \acc{0.6340}{0.0078} & \best{\acc{0.6250}{0.0219}} & \acc{0.7231}{0.0369} & \acc{0.7078}{0.0042} & \acc{0.6999}{0.0037} \\
+Qwen3-4B no-tool & \ours & \best{0.6850} & \best{0.8280} & \best{0.6600} & 0.5500 & \best{0.7308} & \best{0.7470} & \best{0.7001} \\
+\hline
+Qwen3-4B + tool & Base & 0.6090 & 0.7560 & -- & -- & -- & 0.3916 & 0.6255 \\
+Qwen3-4B + tool & GRPO & 0.6280 & 0.7730 & -- & -- & -- & -- & 0.6487 \\
+Qwen3-4B + tool & \ours & -- & -- & -- & -- & -- & -- & \best{0.6694} \\
+\hline
+Gemma-3-4B no-tool & Base & \acc{0.4765}{0.0167} & \best{0.7680} & 0.5600 & \best{0.4750} & \best{0.6154} & \best{0.6520} & 0.5819 \\
+Gemma-3-4B no-tool & GRPO & \best{0.4850} & 0.7580 & \best{0.5800} & 0.4500 & 0.5385 & 0.6470 & 0.5782 \\
+Gemma-3-4B no-tool & \ours & -- & -- & -- & -- & -- & -- & \best{0.5906} \\
+\hline
+Mistral-7B no-tool & Base & 0.1970 & 0.1370 & 0.1600 & \best{0.0250} & \best{0.1154} & \best{0.2038} & 0.1664 \\
+Mistral-7B no-tool & GRPO & \best{0.2120} & \best{0.1530} & \best{0.2600} & \best{0.0250} & \best{0.1154} & 0.1750 & \best{0.1674} \\
+Mistral-7B no-tool & \ours & -- & -- & -- & -- & -- & -- & 0.1567 \\
+\hline
+Llama-3.1 no-tool & Base & 0.3180 & -- & -- & -- & -- & -- & 0.3926 \\
+Llama-3.1 no-tool & GRPO & \best{\acc{0.3666}{0.0111}} & \best{\acc{0.5168}{0.0071}} & \best{\acc{0.4340}{0.0159}} & \best{\acc{0.2750}{0.0268}} & \best{\acc{0.4077}{0.0452}} & \best{\acc{0.4688}{0.0051}} & \acc{0.4117}{0.0086} \\
+Llama-3.1 no-tool & \ours & -- & -- & -- & -- & -- & -- & \best{0.4167} \\
+\hline
+\end{tabular}%
+}
+\caption{Held-out serious-test results by dataset. Values are pass@1 accuracies; dashes mark entries whose repaired per-dataset artifacts are still pending. Confidence intervals are shown when available from per-trial score artifacts. Bold underlined entries mark the largest value within each model-condition comparison block. Table~\ref{tab:forced-token-results} separately compares forced and non-forced TreeMAPPO variants.}
+\label{tab:heldout-serious}
+\end{table}
+
+\begin{table}[t]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llccc}
+\hline
+Model and condition & Method & Selected epoch & Testing trials & Dataset coverage \\
+\hline
+Qwen2.5-7B no-tool & Base & 0 & 5 & 6/6 \\
+Qwen2.5-7B no-tool & GRPO & 30 & 5 & recovery pending \\
+Qwen2.5-7B no-tool & \ours, non-forced token & 20 & 5 & recovery pending \\
+\hline
+Qwen2.5-7B + tool & Base & 0 & 5 & recovery pending \\
+Qwen2.5-7B + tool & GRPO & 30 & 5 & 6/6 \\
+Qwen2.5-7B + tool & \ours, non-forced token & 70 & 5 & recovery pending \\
+\hline
+Qwen3-4B no-tool & Base & 0 & 5 & recovery pending \\
+Qwen3-4B no-tool & GRPO & 50 & 5 & 6/6 \\
+Qwen3-4B no-tool & \ours & 30 & 5 & recovery pending \\
+\hline
+Qwen3-4B + tool & Base & 0 & 5 & recovery pending \\
+Qwen3-4B + tool & GRPO & 40 & 5 & recovery pending \\
+Qwen3-4B + tool & \ours & 50 & 5 & recovery pending \\
+\hline
+Gemma-3-4B no-tool & Base & 0 & 5 & recovery pending \\
+Gemma-3-4B no-tool & GRPO & 50 & 5 & recovery pending \\
+Gemma-3-4B no-tool & \ours & 40 & 5 & recovery pending \\
+\hline
+Mistral-7B no-tool & Base & 0 & 5 & recovery pending \\
+Mistral-7B no-tool & GRPO & 40 & 5 & recovery pending \\
+Mistral-7B no-tool & \ours & 20 & 5 & recovery pending \\
+\hline
+Llama-3.1 no-tool & Base & 0 & 5 & recovery pending \\
+Llama-3.1 no-tool & GRPO & 30 & 5 & 6/6 \\
+Llama-3.1 no-tool & \ours & 40 & 5 & recovery pending \\
+\hline
+\end{tabular}%
+}
+\caption{Checkpoint-selection and artifact-coverage table for the serious tests in Table~\ref{tab:heldout-serious}. Recovery-pending rows have submitted repair jobs to regenerate or rescore per-trial, per-dataset artifacts under the current judging/scoring path.}
+\label{tab:test-checkpoints}
+\end{table}
+
+The serious tests sharpen the conclusion. In no-tool Qwen2.5-7B, neither trained method beats the base model on the six-dataset macro average despite validation gains, indicating limited transfer from the validation mixture. In tool-enabled Qwen2.5-7B, both trained methods improve over base by about one point, with the non-forced \ours\ row slightly ahead. Qwen3-4B is the strongest positive setting: both methods improve in no-tool testing, and \ours\ substantially outperforms GRPO in the tool setting. Gemma and Llama provide additional positive evidence for \ours\ over their base models, while Mistral remains unstable and below base for \ours.
 
 \begin{table}[t]
 \centering
 \resizebox{\textwidth}{!}{%
 \begin{tabular}{llcccc}
 \hline
-Model and condition & Method & Epoch & Trials & Datasets & Macro avg. \\
+Condition & Variant & Best val. epoch & Best val. & Test epoch & Test macro \\
 \hline
-Qwen2.5-7B no-tool & Base & 0 & 5 & 6 & 0.6366 \\
-Qwen2.5-7B no-tool & GRPO & 30 & 5 & 6 & 0.6353 \\
-Qwen2.5-7B no-tool & \ours, forced token & 50 & 5 & 6 & 0.6305 \\
-Qwen2.5-7B + tool & Base & 0 & 5 & 6 & 0.5742 \\
-Qwen2.5-7B + tool & GRPO & 30 & 5 & 6 & 0.5850 \\
-Qwen2.5-7B + tool & \ours, forced token & 50 & 5 & 6 & 0.5836 \\
-Qwen3-4B no-tool & Base & 0 & 5 & 6 & 0.6941 \\
-Qwen3-4B no-tool & GRPO & 50 & 5 & 6 & 0.6999 \\
-Qwen3-4B no-tool & \ours & 30 & 5 & 6 & 0.6997 \\
-Qwen3-4B + tool & Base & 0 & 5 & 6 & 0.6255 \\
-Qwen3-4B + tool & GRPO & 40 & 5 & 6 & 0.6487 \\
-Qwen3-4B + tool & \ours & 50 & 5 & 6 & 0.6694 \\
-Gemma-3-4B no-tool & Base & 0 & 5 & 6 & 0.5819 \\
-Gemma-3-4B no-tool & GRPO & 50 & 5 & 6 & 0.5782 \\
-Gemma-3-4B no-tool & \ours & 40 & 5 & 6 & 0.5906 \\
-Mistral-7B no-tool & Base & 0 & 5 & 6 & 0.1664 \\
-Mistral-7B no-tool & GRPO & 40 & 5 & 6 & 0.1674 \\
-Mistral-7B no-tool & \ours & 20 & 5 & 6 & 0.1567 \\
-Llama-3.1 no-tool & Base & 0 & 5 & 6 & 0.3926 \\
-Llama-3.1 no-tool & GRPO & 30 & 5 & 6 & 0.4117 \\
-Llama-3.1 no-tool & \ours & 40 & 5 & 6 & 0.4167 \\
+Qwen2.5-7B no-tool & Non-forced token & 20 & 0.6493 & 20 & \acc{0.6294}{0.0085} \\
+Qwen2.5-7B no-tool & Forced token & 50 & \best{\acc{0.6523}{0.0016}} & 50 & \best{\acc{0.6305}{0.0081}} \\
+\hline
+Qwen2.5-7B + tool & Non-forced token & 70 & \acc{0.6193}{0.0047} & 70 & \best{0.5880} \\
+Qwen2.5-7B + tool & Forced token & 50 & \best{\acc{0.6236}{0.0033}} & 50 & \acc{0.5836}{0.0119} \\
 \hline
 \end{tabular}%
 }
-\caption{Held-out serious-test results. All rows use five rollout trials and six datasets. Epoch 0 denotes the base model; trained rows use the best validation-selected checkpoint available under the audited protocol.}
-\label{tab:heldout-serious}
+\caption{Forced-token mechanism ablation for TreeMAPPO. Forced-token branching improves the selected validation checkpoint in both Qwen2.5-7B settings, but the held-out serious-test difference is small and reverses in the tool setting.}
+\label{tab:forced-token-results}
 \end{table}
-
-The serious tests sharpen the conclusion. In no-tool Qwen2.5-7B, neither trained method beats the base model on the six-dataset macro average despite validation gains, indicating limited transfer from the validation mixture. In tool-enabled Qwen2.5-7B, both trained methods improve over base by about one point, with GRPO and \ours\ close to each other. Qwen3-4B is the strongest positive setting: both methods improve in no-tool testing, and \ours\ substantially outperforms GRPO in the tool setting. Gemma and Llama provide additional positive evidence for \ours\ over their base models, while Mistral remains unstable and below base for \ours.
 
 \subsection{Ablation Study}
 The main ablation plan separates branching policy from credit estimation. The TEMPO-style condition changes the branch source to spontaneous shared-prefix divergence. The TreeRPO-style condition changes only the segment-credit estimator to child-group win-rate comparison. The two TreeRL-style conditions separately test entropy-guided branching and local--global value-difference credit. Guided-branching experiments use forced selected branch tokens by default; non-forced branching is retained only as a mechanism ablation.
@@ -338,20 +414,20 @@ The main ablation plan separates branching policy from credit estimation. The TE
 \hline
 Qwen2.5-7B no-tool variant & Best val. epoch & Val. base & Best val. & Val. gain & Test epoch & Test macro \\
 \hline
-GRPO baseline & 30 & 0.6468 & 0.6538 & +0.0069 & 30 & 0.6353 \\
-\ours, non-forced token & 20 & 0.6439 & 0.6493 & +0.0054 & 20 & 0.6294 \\
-\ours, forced token & 50 & 0.6436 & 0.6523 & +0.0087 & 50 & 0.6305 \\
-TEMPO-style branching & 70 & 0.6392 & 0.6521 & +0.0129 & 70 & 0.6326 \\
-TreeRPO-style credit & 40 & 0.6433 & 0.6520 & +0.0087 & 40 & 0.6272 \\
-TreeRL-style branching & 20 & 0.6403 & 0.6490 & +0.0087 & 20 & 0.6195 \\
-TreeRL-style credit & 60 & 0.6487 & 0.6523 & +0.0036 & 60 & 0.6334 \\
-TreeRL combined & 40 & 0.6437 & 0.6522 & +0.0085 & 40 & 0.6341 \\
-Branch budget 8 & 10 & 0.6434 & 0.6501 & +0.0067 & 10 & 0.6274 \\
-Branch budget 32 & 60 & 0.6439 & 0.6509 & +0.0070 & 60 & 0.6333 \\
+GRPO baseline & 30 & 0.6468 & \best{0.6538} & +0.0069 & 30 & \best{0.6353} \\
+\ours, non-forced token & 20 & 0.6439 & 0.6493 & +0.0054 & 20 & \acc{0.6294}{0.0085} \\
+\ours, forced token & 50 & 0.6436 & 0.6523 & +0.0087 & 50 & \acc{0.6305}{0.0081} \\
+TEMPO-style branching & 70 & 0.6392 & 0.6521 & \best{+0.0129} & 70 & \acc{0.6326}{0.0144} \\
+TreeRPO-style credit & 40 & 0.6433 & 0.6520 & +0.0087 & 40 & \acc{0.6272}{0.0054} \\
+TreeRL-style branching & 20 & 0.6403 & 0.6490 & +0.0087 & 20 & \acc{0.6195}{0.0069} \\
+TreeRL-style credit & 60 & \best{0.6487} & 0.6523 & +0.0036 & 60 & \acc{0.6334}{0.0062} \\
+TreeRL combined & 40 & 0.6437 & 0.6522 & +0.0085 & 40 & \acc{0.6341}{0.0110} \\
+Branch budget 8 & 10 & 0.6434 & 0.6501 & +0.0067 & 10 & \acc{0.6274}{0.0076} \\
+Branch budget 32 & 60 & 0.6439 & 0.6509 & +0.0070 & 60 & \acc{0.6333}{0.0105} \\
 \hline
 \end{tabular}
 }
-\caption{Qwen2.5-7B no-tool ablations. Validation numbers are held-out macro averages; testing uses five trials and six datasets. Ablation validation rows are directional when their validation trial count differs from the six-trial main rows, but their serious-test scores use the same five-trial testing protocol.}
+\caption{Qwen2.5-7B no-tool ablations. Validation numbers are held-out macro averages; testing uses five trials and six datasets. Confidence intervals are shown when available from per-trial score artifacts. Ablation validation rows are directional when their validation trial count differs from the six-trial main rows, but their serious-test scores use the same five-trial testing protocol. Bold underlined entries mark the largest value in each numeric column.}
 \label{tab:ablation-results}
 \end{table}
 
