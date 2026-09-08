@@ -365,15 +365,8 @@ Our experimental plan includes 8-, 16-, and 32-trajectory variants for the Qwen2
 
 \begin{figure}[t]
 \centering
-\fbox{\parbox{0.95\columnwidth}{\centering
-\vspace{0.4em}
-Branch-budget study\\
-\small x-axis: total trajectories / leaves in tree (8, 16, 32)\\
-\small y-axis: downstream pass@1 on validation or aggregated test\\
-\small show mean and confidence interval bands when repeated runs are available\\
-\vspace{0.4em}
-}}
-\caption{Branching-budget sensitivity. Current results show small differences between 8- and 32-trajectory variants rather than a clear monotonic scaling law.}
+\includegraphics[width=\columnwidth]{images/qwen25_branch_budget_sensitivity.pdf}
+\caption{Branching-budget sensitivity for Qwen2.5-7B no-tool TreeMAPPO variants. The validation line reports the best validation improvement over each run's epoch-0 checkpoint; the serious-test line reports the five-trial, six-dataset macro accuracy at the validation-selected checkpoint.}
 \label{fig:branch-budget}
 \end{figure}
 
