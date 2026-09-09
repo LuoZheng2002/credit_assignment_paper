@@ -12,6 +12,14 @@ def read_rows(path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(handle))
 
 
+def add_upper_headroom(axis, values: list[float], *, fraction: float = 0.35) -> None:
+    lower, upper = axis.get_ylim()
+    data_min = min(values)
+    data_max = max(values)
+    span = max(data_max - data_min, upper - lower, 1.0)
+    axis.set_ylim(lower, data_max + span * fraction)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", type=Path, default=Path("data/qwen25_branch_budget_sensitivity.csv"))
@@ -67,7 +75,18 @@ def main() -> None:
 
     lines = validation_line + test_line
     labels = [line.get_label() for line in lines]
-    left_axis.legend(lines, labels, frameon=False, loc="best")
+    add_upper_headroom(left_axis, validation_gains)
+    add_upper_headroom(right_axis, test_macros)
+    left_axis.legend(
+        lines,
+        labels,
+        frameon=True,
+        framealpha=0.82,
+        edgecolor="none",
+        fontsize=7,
+        handlelength=1.4,
+        loc="upper right",
+    )
     left_axis.set_title("Qwen2.5-7B no-tool branch-budget sensitivity")
 
     for row, x, y in zip(rows, leaves, test_macros):

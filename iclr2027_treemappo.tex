@@ -46,7 +46,7 @@ Our contributions are:
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\textwidth]{images/tree_mappo_methodology.pdf}
+\includegraphics[width=0.7\textwidth]{images/tree_mappo_methodology.pdf}
 \caption{Method overview. \ours\ samples base-policy trajectories, expands selected token-level branch points, infers segment-level contribution and uncertainty from leaf correctness, and converts the resulting posterior estimates into token-level advantages for adapter training.}
 \label{fig:methodology}
 \end{figure}
@@ -261,10 +261,10 @@ Table~\ref{tab:validation-results} summarizes audited held-out validation runs. 
 Model and condition & Method & Trials & Epochs audited & Base & Best epoch & Best & Gain & Last \\
 \hline
 Qwen2.5-7B no-tool & GRPO & 6 & 0,10,\ldots,70 & \best{\acc{0.6468}{0.0033}} & 30 & \best{\acc{0.6538}{0.0021}} & +0.0069 & \best{\acc{0.6522}{0.0039}} \\
-Qwen2.5-7B no-tool & \ours, forced token & 6 & 0,10,\ldots,70 & \acc{0.6436}{0.0025} & 50 & \acc{0.6523}{0.0016} & \best{+0.0087} & \acc{0.6494}{0.0035} \\
+Qwen2.5-7B no-tool & \ours & 6 & 0,10,\ldots,70 & \acc{0.6436}{0.0025} & 50 & \acc{0.6523}{0.0016} & \best{+0.0087} & \acc{0.6494}{0.0035} \\
 \hline
 Qwen2.5-7B + tool & GRPO & 6 & 0,10,\ldots,70 & \best{\acc{0.6142}{0.0033}} & 30 & \best{\acc{0.6246}{0.0024}} & \best{+0.0104} & \acc{0.6171}{0.0046} \\
-Qwen2.5-7B + tool & \ours, forced token & 6 & 0,10,\ldots,70 & \acc{0.6134}{0.0034} & 50 & \acc{0.6236}{0.0033} & +0.0101 & \best{\acc{0.6181}{0.0016}} \\
+Qwen2.5-7B + tool & \ours & 6 & 0,10,\ldots,70 & \acc{0.6134}{0.0034} & 50 & \acc{0.6236}{0.0033} & +0.0101 & \best{\acc{0.6181}{0.0016}} \\
 \hline
 Qwen3-4B no-tool & GRPO & 6 & 0,10,\ldots,50 & \best{\acc{0.6901}{0.0021}} & 50 & \best{\acc{0.6991}{0.0038}} & \best{+0.0089} & \best{\acc{0.6991}{0.0038}} \\
 Qwen3-4B no-tool & \ours & 6 & 0,10,\ldots,50 & \acc{0.6894}{0.0017} & 30 & \acc{0.6944}{0.0024} & +0.0050 & \acc{0.6849}{0.0047} \\
@@ -308,33 +308,33 @@ Table~\ref{tab:heldout-serious} reports serious tests on the broader six-dataset
 \cline{3-5}\cline{6-8}
 Model and condition & Method & DeepMath & MATH & NuminaMath & AMC 2023 & GaoKao 2024 & CollegeMath & Macro avg. \\
 \hline
-Qwen2.5-7B no-tool & Base & \best{\acc{0.6034}{0.0030}} & \best{\acc{0.7400}{0.0056}} & \best{\acc{0.6160}{0.0211}} & \best{\acc{0.5400}{0.0480}} & \best{\acc{0.6000}{0.0511}} & \best{\acc{0.7204}{0.0029}} & \best{\acc{0.6366}{0.0145}} \\
-Qwen2.5-7B no-tool & GRPO & -- & -- & -- & -- & -- & -- & 0.6353 \\
-Qwen2.5-7B no-tool & \ours, non-forced token & -- & -- & -- & -- & -- & -- & \acc{0.6294}{0.0085} \\
+Qwen2.5-7B no-tool & Base & \acc{0.6034}{0.0030} & \best{\acc{0.7400}{0.0056}} & \best{\acc{0.6160}{0.0211}} & \acc{0.5400}{0.0480} & \acc{0.6000}{0.0511} & \best{\acc{0.7204}{0.0029}} & \best{\acc{0.6366}{0.0145}} \\
+Qwen2.5-7B no-tool & GRPO & \acc{0.5886}{0.0028} & \acc{0.7338}{0.0056} & \acc{0.5940}{0.0133} & \acc{0.5200}{0.0475} & \best{\acc{0.6692}{0.0185}} & \acc{0.7062}{0.0042} & \acc{0.6353}{0.0118} \\
+Qwen2.5-7B no-tool & \ours & \best{\acc{0.6050}{0.0059}} & \acc{0.7362}{0.0031} & \acc{0.5880}{0.0073} & \best{\acc{0.5900}{0.0480}} & \acc{0.5615}{0.0185} & \acc{0.7016}{0.0043} & \acc{0.6304}{0.0081} \\
 \hline
 Qwen2.5-7B + tool & Base & -- & -- & -- & -- & -- & -- & 0.5742 \\
-Qwen2.5-7B + tool & GRPO & \acc{0.5808}{0.0065} & \best{\acc{0.6986}{0.0053}} & \acc{0.5580}{0.0114} & \best{\acc{0.4750}{0.0410}} & \best{\acc{0.5385}{0.0413}} & \acc{0.6508}{0.0029} & \acc{0.5836}{0.0148} \\
-Qwen2.5-7B + tool & \ours, non-forced token & \best{\acc{0.5940}{0.0039}} & 0.6950 & \best{0.5700} & 0.4500 & \best{0.5385} & \best{0.6540} & \best{\acc{0.5880}{0.0079}} \\
+Qwen2.5-7B + tool & GRPO & \acc{0.5808}{0.0065} & \acc{0.6986}{0.0053} & \acc{0.5580}{0.0114} & \best{\acc{0.4750}{0.0410}} & \best{\acc{0.5385}{0.0413}} & \acc{0.6508}{0.0029} & \acc{0.5836}{0.0148} \\
+Qwen2.5-7B + tool & \ours & \best{\acc{0.5846}{0.0062}} & \best{\acc{0.7036}{0.0046}} & \best{\acc{0.5880}{0.0243}} & \acc{0.4600}{0.0504} & \acc{0.5231}{0.0185} & \best{\acc{0.6542}{0.0039}} & \best{\acc{0.5856}{0.0119}} \\
 \hline
-Qwen3-4B no-tool & Base & 0.5610 & -- & -- & -- & -- & -- & 0.6941 \\
-Qwen3-4B no-tool & GRPO & \acc{0.6846}{0.0038} & \acc{0.8250}{0.0069} & \acc{0.6340}{0.0078} & \best{\acc{0.6250}{0.0219}} & \acc{0.7231}{0.0369} & \acc{0.7078}{0.0042} & \acc{0.6999}{0.0037} \\
-Qwen3-4B no-tool & \ours & \best{0.6850} & \best{0.8280} & \best{0.6600} & 0.5500 & \best{0.7308} & \best{0.7470} & \best{0.7001} \\
+Qwen3-4B no-tool & Base & \acc{0.6716}{0.0035} & \acc{0.8244}{0.0032} & \acc{0.6240}{0.0202} & \acc{0.5800}{0.0392} & \acc{0.7615}{0.0282} & \acc{0.7022}{0.0022} & \acc{0.6940}{0.0109} \\
+Qwen3-4B no-tool & GRPO & \best{\acc{0.6846}{0.0038}} & \acc{0.8250}{0.0069} & \best{\acc{0.6340}{0.0078}} & \best{\acc{0.6250}{0.0219}} & \acc{0.7231}{0.0369} & \best{\acc{0.7078}{0.0042}} & \best{\acc{0.6999}{0.0037}} \\
+\hspace{0pt}Qwen3-4B no-tool & \ours & \acc{0.6840}{0.0092} & \best{\acc{0.8368}{0.0047}} & \acc{0.6120}{0.0073} & \acc{0.5850}{0.0250} & \best{\acc{0.7769}{0.0554}} & \acc{0.7034}{0.0022} & \acc{0.6997}{0.0098} \\
 \hline
-Qwen3-4B + tool & Base & 0.6090 & 0.7560 & -- & -- & -- & 0.3916 & 0.6255 \\
-Qwen3-4B + tool & GRPO & 0.6280 & 0.7730 & -- & -- & -- & -- & 0.6487 \\
-Qwen3-4B + tool & \ours & -- & -- & -- & -- & -- & -- & \best{0.6694} \\
+Qwen3-4B + tool & Base & \acc{0.6078}{0.0056} & \acc{0.7458}{0.0044} & \acc{0.5900}{0.0164} & \acc{0.5850}{0.0250} & \acc{0.5692}{0.0440} & \acc{0.6616}{0.0029} & \acc{0.6266}{0.0099} \\
+Qwen3-4B + tool & GRPO & \acc{0.6288}{0.0063} & \best{\acc{0.7734}{0.0073}} & \acc{0.5480}{0.0144} & \best{\acc{0.6650}{0.0250}} & \acc{0.6077}{0.0369} & \acc{0.6692}{0.0069} & \acc{0.6487}{0.0084} \\
+Qwen3-4B + tool & \ours & \best{\acc{0.6340}{0.0095}} & \acc{0.7670}{0.0021} & \best{\acc{0.6020}{0.0096}} & \acc{0.6500}{0.0410} & \best{\acc{0.6846}{0.0282}} & \best{\acc{0.6788}{0.0035}} & \best{\acc{0.6694}{0.0101}} \\
 \hline
-Gemma-3-4B no-tool & Base & \acc{0.4765}{0.0167} & \best{0.7680} & 0.5600 & \best{0.4750} & \best{0.6154} & \best{0.6520} & 0.5819 \\
-Gemma-3-4B no-tool & GRPO & \best{0.4850} & 0.7580 & \best{0.5800} & 0.4500 & 0.5385 & 0.6470 & 0.5782 \\
-Gemma-3-4B no-tool & \ours & -- & -- & -- & -- & -- & -- & \best{0.5906} \\
+Gemma-3-4B no-tool & Base & \acc{0.4780}{0.0067} & \acc{0.7606}{0.0043} & \acc{0.5580}{0.0114} & \acc{0.4800}{0.0646} & \acc{0.5692}{0.0282} & \best{\acc{0.6456}{0.0049}} & \acc{0.5819}{0.0115} \\
+Gemma-3-4B no-tool & GRPO & \acc{0.4810}{0.0059} & \acc{0.7610}{0.0027} & \best{\acc{0.5920}{0.0114}} & \acc{0.4300}{0.0240} & \acc{0.5769}{0.0238} & \acc{0.6402}{0.0039} & \acc{0.5802}{0.0093} \\
+Gemma-3-4B no-tool & \ours & \best{\acc{0.4846}{0.0122}} & \best{\acc{0.7670}{0.0078}} & \acc{0.5720}{0.0130} & \best{\acc{0.5050}{0.0567}} & \best{\acc{0.5769}{0.0238}} & \acc{0.6382}{0.0047} & \best{\acc{0.5906}{0.0117}} \\
 \hline
-Mistral-7B no-tool & Base & 0.1970 & 0.1370 & 0.1600 & \best{0.0250} & \best{0.1154} & \best{0.2038} & 0.1664 \\
-Mistral-7B no-tool & GRPO & \best{0.2120} & \best{0.1530} & \best{0.2600} & \best{0.0250} & \best{0.1154} & 0.1750 & \best{0.1674} \\
-Mistral-7B no-tool & \ours & -- & -- & -- & -- & -- & -- & 0.1567 \\
+Mistral-7B no-tool & Base & \acc{0.1910}{0.0092} & \acc{0.1474}{0.0035} & \acc{0.1900}{0.0124} & \best{\acc{0.0650}{0.0332}} & \best{\acc{0.2154}{0.0452}} & \acc{0.1728}{0.0040} & \acc{0.1636}{0.0129} \\
+Mistral-7B no-tool & GRPO & \best{\acc{0.2136}{0.0062}} & \acc{0.1528}{0.0063} & \best{\acc{0.2560}{0.0237}} & \acc{0.0500}{0.0155} & \acc{0.1538}{0.0238} & \best{\acc{0.1782}{0.0069}} & \best{\acc{0.1674}{0.0031}} \\
+Mistral-7B no-tool & \ours & \acc{0.2014}{0.0058} & \best{\acc{0.1562}{0.0061}} & \acc{0.1980}{0.0180} & \acc{0.0350}{0.0250} & \acc{0.1769}{0.0511} & \acc{0.1728}{0.0032} & \acc{0.1567}{0.0097} \\
 \hline
-Llama-3.1 no-tool & Base & 0.3180 & -- & -- & -- & -- & -- & 0.3926 \\
-Llama-3.1 no-tool & GRPO & \best{\acc{0.3666}{0.0111}} & \best{\acc{0.5168}{0.0071}} & \best{\acc{0.4340}{0.0159}} & \best{\acc{0.2750}{0.0268}} & \best{\acc{0.4077}{0.0452}} & \best{\acc{0.4688}{0.0051}} & \acc{0.4117}{0.0086} \\
-Llama-3.1 no-tool & \ours & -- & -- & -- & -- & -- & -- & \best{0.4167} \\
+Llama-3.1 no-tool & Base & \acc{0.3250}{0.0065} & \acc{0.4954}{0.0032} & \acc{0.4040}{0.0100} & \acc{0.2850}{0.0332} & \acc{0.3846}{0.0238} & \acc{0.4642}{0.0052} & \acc{0.3930}{0.0036} \\
+Llama-3.1 no-tool & GRPO & \best{\acc{0.3666}{0.0111}} & \best{\acc{0.5168}{0.0071}} & \acc{0.4340}{0.0159} & \acc{0.2750}{0.0268} & \best{\acc{0.4077}{0.0452}} & \acc{0.4688}{0.0051} & \acc{0.4115}{0.0086} \\
+Llama-3.1 no-tool & \ours & \acc{0.3314}{0.0045} & \acc{0.5146}{0.0118} & \best{\acc{0.4480}{0.0114}} & \best{\acc{0.3200}{0.0098}} & \best{\acc{0.4077}{0.0612}} & \best{\acc{0.4784}{0.0080}} & \best{\acc{0.4167}{0.0081}} \\
 \hline
 \end{tabular}%
 }
@@ -350,32 +350,32 @@ Llama-3.1 no-tool & \ours & -- & -- & -- & -- & -- & -- & \best{0.4167} \\
 Model and condition & Method & Selected epoch & Testing trials & Dataset coverage \\
 \hline
 Qwen2.5-7B no-tool & Base & 0 & 5 & 6/6 \\
-Qwen2.5-7B no-tool & GRPO & 30 & 5 & recovery pending \\
-Qwen2.5-7B no-tool & \ours, non-forced token & 20 & 5 & recovery pending \\
+Qwen2.5-7B no-tool & GRPO & 30 & 5 & 6/6 \\
+Qwen2.5-7B no-tool & \ours & 50 & 5 & 6/6 \\
 \hline
 Qwen2.5-7B + tool & Base & 0 & 5 & recovery pending \\
 Qwen2.5-7B + tool & GRPO & 30 & 5 & 6/6 \\
-Qwen2.5-7B + tool & \ours, non-forced token & 70 & 5 & recovery pending \\
+Qwen2.5-7B + tool & \ours & 50 & 5 & 6/6 \\
 \hline
-Qwen3-4B no-tool & Base & 0 & 5 & recovery pending \\
+Qwen3-4B no-tool & Base & 0 & 5 & 6/6 \\
 Qwen3-4B no-tool & GRPO & 50 & 5 & 6/6 \\
-Qwen3-4B no-tool & \ours & 30 & 5 & recovery pending \\
+Qwen3-4B no-tool & \ours & 30 & 5 & 6/6 \\
 \hline
-Qwen3-4B + tool & Base & 0 & 5 & recovery pending \\
-Qwen3-4B + tool & GRPO & 40 & 5 & recovery pending \\
-Qwen3-4B + tool & \ours & 50 & 5 & recovery pending \\
+Qwen3-4B + tool & Base & 0 & 5 & 6/6 \\
+Qwen3-4B + tool & GRPO & 40 & 5 & 6/6 \\
+Qwen3-4B + tool & \ours & 50 & 5 & 6/6 \\
 \hline
-Gemma-3-4B no-tool & Base & 0 & 5 & recovery pending \\
-Gemma-3-4B no-tool & GRPO & 50 & 5 & recovery pending \\
-Gemma-3-4B no-tool & \ours & 40 & 5 & recovery pending \\
+Gemma-3-4B no-tool & Base & 0 & 5 & 6/6 \\
+Gemma-3-4B no-tool & GRPO & 50 & 5 & 6/6 \\
+Gemma-3-4B no-tool & \ours & 40 & 5 & 6/6 \\
 \hline
-Mistral-7B no-tool & Base & 0 & 5 & recovery pending \\
-Mistral-7B no-tool & GRPO & 40 & 5 & recovery pending \\
-Mistral-7B no-tool & \ours & 20 & 5 & recovery pending \\
+Mistral-7B no-tool & Base & 0 & 5 & 6/6 \\
+Mistral-7B no-tool & GRPO & 40 & 5 & 6/6 \\
+Mistral-7B no-tool & \ours & 20 & 5 & 6/6 \\
 \hline
-Llama-3.1 no-tool & Base & 0 & 5 & recovery pending \\
+Llama-3.1 no-tool & Base & 0 & 5 & 6/6 \\
 Llama-3.1 no-tool & GRPO & 30 & 5 & 6/6 \\
-Llama-3.1 no-tool & \ours & 40 & 5 & recovery pending \\
+Llama-3.1 no-tool & \ours & 40 & 5 & 6/6 \\
 \hline
 \end{tabular}%
 }
@@ -383,7 +383,7 @@ Llama-3.1 no-tool & \ours & 40 & 5 & recovery pending \\
 \label{tab:test-checkpoints}
 \end{table}
 
-The serious tests sharpen the conclusion. In no-tool Qwen2.5-7B, neither trained method beats the base model on the six-dataset macro average despite validation gains, indicating limited transfer from the validation mixture. In tool-enabled Qwen2.5-7B, both trained methods improve over base by about one point, with the non-forced \ours\ row slightly ahead. Qwen3-4B is the strongest positive setting: both methods improve in no-tool testing, and \ours\ substantially outperforms GRPO in the tool setting. Gemma and Llama provide additional positive evidence for \ours\ over their base models, while Mistral remains unstable and below base for \ours.
+The serious tests sharpen the conclusion. In no-tool Qwen2.5-7B, neither trained method beats the base model on the six-dataset macro average despite validation gains, indicating limited transfer from the validation mixture. In tool-enabled Qwen2.5-7B, both trained methods improve over base by about one point, with \ours\ close to GRPO. Qwen3-4B is the strongest positive setting: both methods improve in no-tool testing, and \ours\ substantially outperforms GRPO in the tool setting. Gemma and Llama provide additional positive evidence for \ours\ over their base models, while Mistral remains unstable and below base for \ours.
 
 \begin{table}[t]
 \centering
@@ -393,10 +393,10 @@ The serious tests sharpen the conclusion. In no-tool Qwen2.5-7B, neither trained
 Condition & Variant & Best val. epoch & Best val. & Test epoch & Test macro \\
 \hline
 Qwen2.5-7B no-tool & Non-forced token & 20 & 0.6493 & 20 & \acc{0.6294}{0.0085} \\
-Qwen2.5-7B no-tool & Forced token & 50 & \best{\acc{0.6523}{0.0016}} & 50 & \best{\acc{0.6305}{0.0081}} \\
+Qwen2.5-7B no-tool & Forced token & 50 & \best{\acc{0.6523}{0.0016}} & 50 & \best{\acc{0.6304}{0.0081}} \\
 \hline
 Qwen2.5-7B + tool & Non-forced token & 70 & \acc{0.6193}{0.0047} & 70 & \best{0.5880} \\
-Qwen2.5-7B + tool & Forced token & 50 & \best{\acc{0.6236}{0.0033}} & 50 & \acc{0.5836}{0.0119} \\
+Qwen2.5-7B + tool & Forced token & 50 & \best{\acc{0.6236}{0.0033}} & 50 & \acc{0.5856}{0.0119} \\
 \hline
 \end{tabular}%
 }
@@ -416,7 +416,7 @@ Qwen2.5-7B no-tool variant & Best val. epoch & Val. base & Best val. & Val. gain
 \hline
 GRPO baseline & 30 & 0.6468 & \best{0.6538} & +0.0069 & 30 & \best{0.6353} \\
 \ours, non-forced token & 20 & 0.6439 & 0.6493 & +0.0054 & 20 & \acc{0.6294}{0.0085} \\
-\ours, forced token & 50 & 0.6436 & 0.6523 & +0.0087 & 50 & \acc{0.6305}{0.0081} \\
+\ours, forced token & 50 & 0.6436 & 0.6523 & +0.0087 & 50 & \acc{0.6304}{0.0081} \\
 TEMPO-style branching & 70 & 0.6392 & 0.6521 & \best{+0.0129} & 70 & \acc{0.6326}{0.0144} \\
 TreeRPO-style credit & 40 & 0.6433 & 0.6520 & +0.0087 & 40 & \acc{0.6272}{0.0054} \\
 TreeRL-style branching & 20 & 0.6403 & 0.6490 & +0.0087 & 20 & \acc{0.6195}{0.0069} \\

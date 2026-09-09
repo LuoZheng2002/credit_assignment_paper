@@ -13,6 +13,14 @@ def read_rows(path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(handle))
 
 
+def add_upper_headroom(axis, values: list[float], *, fraction: float = 0.28) -> None:
+    lower, upper = axis.get_ylim()
+    data_min = min(values)
+    data_max = max(values)
+    span = max(data_max - data_min, upper - lower, 1.0)
+    axis.set_ylim(lower, data_max + span * fraction)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", type=Path, default=Path("data/qwen25_r32_lr1e6_epoch_accuracy.csv"))
@@ -51,6 +59,7 @@ def main() -> None:
     })
     fig, ax = plt.subplots(figsize=(5.8, 3.0))
     markers = ["o", "s", "^", "D"]
+    plotted_values: list[float] = []
     for index, (label, points) in enumerate(sorted(series.items())):
         points.sort()
         baseline = next((accuracy for epoch, accuracy in points if epoch == 0), None)
@@ -62,6 +71,7 @@ def main() -> None:
         else:
             ys = [(accuracy - baseline) * 100.0 for _, accuracy in points]
         ax.plot(xs, ys, marker=markers[index % len(markers)], linewidth=1.8, markersize=4.5, label=label)
+        plotted_values.extend(ys)
         best_index = max(range(len(points)), key=lambda i: points[i][1])
         ax.scatter([xs[best_index]], [ys[best_index]], s=52, facecolors="none", edgecolors="black", linewidths=1.0, zorder=4)
 
@@ -74,8 +84,16 @@ def main() -> None:
         ax.set_ylabel("Validation accuracy improvement (points)")
         ax.set_title("Qwen2.5-7B no-tool validation improvement")
     ax.grid(axis="y", alpha=0.25, linewidth=0.7)
-    ax.legend(frameon=False, loc="best")
     ax.set_xticks(sorted({int(row["epoch"]) for row in rows}))
+    add_upper_headroom(ax, plotted_values)
+    ax.legend(
+        frameon=True,
+        framealpha=0.82,
+        edgecolor="none",
+        fontsize=7,
+        handlelength=1.4,
+        loc="upper right",
+    )
     fig.tight_layout()
     args.output.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(args.output, bbox_inches="tight")
