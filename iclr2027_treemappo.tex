@@ -481,6 +481,141 @@ This work studies mathematical reasoning benchmarks and does not involve human-s
 \subsection*{Reproducibility statement}
 The paper reports the model families, rollout protocol, training hyperparameters, validation cadence, and testing protocol used in the experiments. The implementation uses chunked artifacts, explicit judging/scoring passes, and recorded metadata for validation and testing so that experiment outputs can be audited and regenerated.
 
+\appendix
+\section{Qualitative Case Study}
+We inspected generated training trajectories for a Qwen2.5-7B tool-enabled \ours\ run and selected a NuminaMath question that also appears in the no-tool ablation tree artifacts: ``A woman is 42 years of age and her daughter is 8 years old. In a certain number of years, the mother will be three times as old as her daughter. How many years will it take for the mother to be three times as old as her daughter?'' The correct equation is $42+x=3(8+x)$, giving $x=9$.
+
+Figure~\ref{fig:case-study-prompts} gives the exact decoded prompts seen by the model in the tool and no-tool \ours\ settings, including the Qwen chat-template markers present in the trajectory artifacts. Figures~\ref{fig:case-study-trajectory} and~\ref{fig:case-study-ablation-trajectories} show exact raw trajectory excerpts from \ours\ and available ablations. For the main tool/no-tool comparison, we use the same question. For the ablation panels, we intentionally allow different questions because questions whose sampled leaves are uniformly correct or uniformly incorrect produce zero or near-zero advantages under several credit rules; such cases are uninformative for visualizing how each method distributes credit. The displayed ablation questions are listed in each panel.
+
+The colors are used only to visualize token-level training advantages for readers and automated reviewers; they are not part of the model input or output. Prompt tokens and Python tool outputs have ignored labels and are not colored. Each trajectory uses an adaptive muted red--yellow--green interpolation: the largest absolute advantage in that trajectory saturates to dark red or dark green, so color shows within-trajectory credit structure while the printed numbers show cross-trajectory scale. In the tool-enabled \ours\ trajectory, the model first solves the equation with a Python call but writes an incorrect answer, receives the actual tool response $9$, and then corrects the final answer to $\boxed{9}$. The early setup receives weak negative credit, while the post-tool repair receives positive credit.
+
+\begin{figure*}[t]
+\centering
+\fbox{\begin{minipage}{0.47\textwidth}
+\small
+\textbf{Tool prompt, exact decoded trajectory prefix.}\\[2pt]
+\begingroup\ttfamily\scriptsize\raggedright\sloppy
+<|im\_start|>system\\
+You are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im\_end|>\\
+<|im\_start|>user\\
+You are a helpful agent that solves the following problem.\\
+Question: A woman is 42 years of age and her daughter is 8 years old. In a certain number of years, the mother will be three times as old as her daughter. How many years will it take for the mother to be three times as old as her daughter?\\
+You are encouraged to use the Python code executor to help you do calculations to ensure correctness. You can invoke python code by emitting a Python markdown code block like this:\\
+```python\\
+import numpy as np\\
+A = np.array([[2, 1], [1, -1]])\\
+b = np.array([5, 1])\\
+solution = np.linalg.solve(A, b)\\
+solution\\
+```\\
+You should reason step by step, and put the final answer in a \textbackslash{}boxed\{\}.\\
+Begin your reasoning:<|im\_end|>\\
+<|im\_start|>assistant
+\endgroup
+\end{minipage}}
+\hfill
+\fbox{\begin{minipage}{0.47\textwidth}
+\small
+\textbf{No-tool prompt, exact decoded trajectory prefix.}\\[2pt]
+\begingroup\ttfamily\scriptsize\raggedright\sloppy
+<|im\_start|>system\\
+You are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im\_end|>\\
+<|im\_start|>user\\
+You are a helpful agent that solves the following problem.\\
+Question: A woman is 42 years of age and her daughter is 8 years old. In a certain number of years, the mother will be three times as old as her daughter. How many years will it take for the mother to be three times as old as her daughter?\\
+You should reason step by step, and put the final answer in a \textbackslash{}boxed\{\}.\\
+Begin your reasoning:<|im\_end|>\\
+<|im\_start|>assistant
+\endgroup
+\end{minipage}}
+\caption{Exact prompts for the same Qwen2.5-7B case-study question. These strings are decoded from the ignored prompt-token prefix in the msgpack training trajectories; they are not manually rewritten prompts.}
+\label{fig:case-study-prompts}
+\end{figure*}
+
+\begin{figure*}[t]
+\centering
+\fbox{\begin{minipage}{0.95\textwidth}
+\small
+\textbf{Question.} A woman is 42 years old and her daughter is 8 years old. In how many years will the mother be three times as old as her daughter?\\[2pt]
+\textbf{Colored raw trajectory excerpt.}
+\begingroup\ttfamily\scriptsize\raggedright\sloppy
+\textcolor[RGB]{142,106,41}{Let's denote the number of years from now when the mother will be three times as old as her daughter by \textbackslash{}( x \textbackslash{}). Currently, the mother is 42 years old and the daughter is 8 years old. In \textbackslash{}( x \textbackslash{}) years, the ages are \textbackslash{}(42+x\textbackslash{}) and \textbackslash{}(8+x\textbackslash{}). According to the problem,}
+\textcolor[RGB]{101,120,49}{ the mother's age will be three times the daughter's age: \textbackslash{}[42+x=3(8+x)\textbackslash{}]. Now we solve this equation using Python: ```python from sympy import symbols, Eq, solve ... solution}
+\textcolor[RGB]{20,110,55}{[0] ``` :boxed\{6\}. So, it will take 6 years for the mother to be three times as old as her daughter.}\\
+<tool\_response>9</tool\_response>\\
+\textcolor[RGB]{20,110,55}{It seems there was an error in my previous calculation. Let's re-solve the equation step by step: \textbackslash{}[42+x=3(8+x)\textbackslash{}], so \textbackslash{}[42+x=24+3x\textbackslash{}].}
+\textcolor[RGB]{32,111,54}{ Rearranging terms, \textbackslash{}[42-24=3x-x\textbackslash{}], \textbackslash{}[18=2x\textbackslash{}], and \textbackslash{}[x=9\textbackslash{}]. Therefore, the correct answer is \textbackslash{}[\textbackslash{}boxed\{9\}\textbackslash{}].}
+\endgroup\\[2pt]
+\textbf{Observed segment advantages.} $-0.114,\,+0.222,\,+0.635,\,+0.635,\,+0.576$.
+\end{minipage}}
+\caption{Case study from Qwen2.5-7B with tool use. The displayed text is copied from the msgpack training trajectory, with only LaTeX escaping and ellipses added for space. The black tool-response line is ignored by the training loss but explains why the following model segment can repair the answer.}
+\label{fig:case-study-trajectory}
+\end{figure*}
+
+\begin{figure*}[t]
+\centering
+\fbox{\begin{minipage}{0.95\textwidth}
+\small
+\textbf{\ours, no-tool.} \emph{Question:} A woman is 42 years old and her daughter is 8 years old. In how many years will the mother be three times as old as her daughter?\\
+The sampled no-tool tree solves the age equation directly, so the posterior has little corrective contrast to exploit.\\
+\begingroup\ttfamily\scriptsize\raggedright\sloppy
+\textcolor[RGB]{20,110,55}{Let's denote the number of years from now when the mother will be three times as old as her daughter as \textbackslash{}(x\textbackslash{}). Currently, the mother's age is 42 years and the daughter's age is 8 years. In \textbackslash{}(x\textbackslash{}) years, the mother's age will be \textbackslash{}(42+x\textbackslash{}) and the daughter's age will be \textbackslash{}(8+x\textbackslash{}).}
+We can set up the equation \textbackslash{}[42+x=3(8+x)\textbackslash{}], solve it, and obtain \textbackslash{}(x=9\textbackslash{}). The final answer is \textbackslash{}(\textbackslash{}boxed\{9\}\textbackslash{}).
+\endgroup\\[-2pt]
+\textbf{Advantages:} $\textcolor[RGB]{20,110,55}{+0.074},0$.\\[4pt]
+
+\textbf{GRPO, no-tool.} \emph{Question:} Find the auxiliary equation for the ordinary differential equation with constant coefficients \((x^2D^2+xD+1)y=\sin(2\log x)\sin(\log x)\).\\
+GRPO assigns one terminal group-normalized advantage to the entire response.\\
+\begingroup\ttfamily\scriptsize\raggedright\sloppy
+\textcolor[RGB]{20,110,55}{\detokenize{To find the auxiliary equation for the given ordinary differential equation with constant coefficients, we first recognize that the equation is not in a standard constant-coefficient form because the operator contains \(x^2D^2+xD+1\). We rewrite it through the substitution \(t=\log x\), where \(xD\) acts like differentiation with respect to \(t\). This yields the auxiliary equation \(m^2+1=0\).}}
+\endgroup\\[-2pt]
+\textbf{Advantages:} $\textcolor[RGB]{20,110,55}{+1.732}$ for this representative response.\\[4pt]
+
+\textbf{TEMPO-style branching.} \emph{Question:} Find the auxiliary equation for the ordinary differential equation with constant coefficients \((x^2D^2+xD+1)y=\sin(2\log x)\sin(\log x)\).\\
+Spontaneous prefix-tree branching produces a nonzero but fragmented early credit pattern.\\
+\begingroup\ttfamily\scriptsize\raggedright\sloppy
+\textcolor[RGB]{113,121,48}{To find the auxiliary equation for the given ordinary differential equation, we need to}
+\textcolor[RGB]{123,122,47}{ follow these steps.}
+\textcolor[RGB]{139,81,37}{ First identify the}
+\textcolor[RGB]{102,120,48}{ homogeneous part of the ODE:}
+\textcolor[RGB]{20,110,55}{\detokenize{ \((x^2D^2+xD+1)y=0\). Assume \(y=x^m\), substitute \(y'=mx^{m-1}\) and \(y''=m(m-1)x^{m-2}\), and simplify to \(m^2+1=0\).}}
+\endgroup\\[-2pt]
+\textbf{Advantages:} $\textcolor[RGB]{113,121,48}{+0.162},\textcolor[RGB]{123,122,47}{+0.111},\textcolor[RGB]{139,81,37}{-0.263},\textcolor[RGB]{102,120,48}{+0.217},\textcolor[RGB]{20,110,55}{+0.633}$.
+\end{minipage}}
+\vspace{4pt}
+\fbox{\begin{minipage}{0.95\textwidth}
+\small
+\textbf{TreeRPO-style credit.} \emph{Question:} Suppose \(g(x)=5x-3\). What is \(g^{-1}(g^{-1}(14))\)?\\
+The child-group win-rate rule gives a strong sign change around the transition from generic inverse derivation to the nested evaluation.\\
+\begingroup\ttfamily\scriptsize\raggedright\sloppy
+\textcolor[RGB]{141,97,40}{\detokenize{To solve for \(g^{-1}(g^{-1}(14))\), first find the inverse of \(g(x)=5x-3\). Set \(y=5x-3\), solve \(x=(y+3)/5\), and obtain \(g^{-1}(x)=(x+3)/5\).}}
+\textcolor[RGB]{20,110,55}{\detokenize{ Then compute \(g^{-1}(14)=17/5\), followed by \(g^{-1}(17/5)=((17/5)+3)/5=32/25\). Therefore, the final answer is \(\boxed{32/25}\).}}
+\endgroup\\[-2pt]
+\textbf{Advantages:} $\textcolor[RGB]{141,97,40}{-0.525},\textcolor[RGB]{20,110,55}{+2.000}$.\\[4pt]
+
+\textbf{TreeRL-style credit.} \emph{Question:} Given \(f(x,y)=e^{-(x+y)}\) for \(x>0,y>0\), compute \(P(Y>X+1)\).\\
+The local--global value rule creates a coarse negative-to-positive split over the integral setup and evaluation.\\
+\begingroup\ttfamily\scriptsize\raggedright\sloppy
+\textcolor[RGB]{133,43,29}{\detokenize{To compute \(P(Y>X+1)\), integrate \(e^{-(x+y)}\) over \(x>0\) and \(y>x+1\). Set up \( \int_0^\infty \int_{x+1}^\infty e^{-(x+y)}\,dy\,dx \).}}
+\textcolor[RGB]{20,110,55}{\detokenize{ The inner integral becomes \( \int_{2x+1}^\infty e^{-u}\,du=e^{-(2x+1)} \), after which the remaining integral can be evaluated.}}
+\endgroup\\[-2pt]
+\textbf{Advantages:} $\textcolor[RGB]{133,43,29}{-0.219},\textcolor[RGB]{20,110,55}{+0.281}$.\\[4pt]
+
+\textbf{TreeRL-style branching.} \emph{Question:} Evaluate \( \lim_{x\to0}\left(1/\tan^2x-1/x^2\right) \).\\
+Entropy-guided branching yields a long recovery pattern with a negative initial transformation and a positive Taylor-expansion segment.\\
+\begingroup\ttfamily\scriptsize\raggedright\sloppy
+\textcolor[RGB]{139,83,37}{\detokenize{Start by writing \(\tan x=\sin x/\cos x\), so \(1/\tan^2x=\cos^2x/\sin^2x\). Combining terms gives \((x^2\cos^2x-\sin^2x)/(x^2\sin^2x)\).}}
+\textcolor[RGB]{20,110,55}{\detokenize{ Then analyze the numerator and denominator as \(x\to0\) using Taylor series for \(\sin x\) and \(\cos x\), which reveals the limiting constant after cancellation.}}
+\endgroup\\[-2pt]
+\textbf{Advantages:} $\textcolor[RGB]{139,83,37}{-0.323},\textcolor[RGB]{20,110,55}{+0.805}$.
+\end{minipage}}
+\caption{Representative trajectory excerpts for available Qwen2.5-7B no-tool ablations. Unlike the main tool/no-tool comparison, ablation panels may use different questions so that the visualized examples avoid the uniform-correctness regime where several advantage rules collapse to zero. The examples are reconstructed from judged tree artifacts for qualitative analysis.}
+\label{fig:case-study-ablation-trajectories}
+\end{figure*}
+
+This appendix is qualitative rather than a substitute for aggregate validation. It illustrates why the \ours\ design combines guided branching with posterior segment credit. GRPO supplies only a whole-response terminal signal, so it cannot distinguish setup, computation, and repair inside a response. TreeRPO- and TreeRL-style backups can create useful sign changes, but their values are coarser because they are backed up from subtree correctness rates rather than inferred as latent segment contributions. TEMPO-style branching and TreeRL-style entropy branching can expose alternative paths, but their branch construction is less tightly coupled to the token-level intervention used by \ours. In the tool-enabled \ours\ trajectory, the method preserves the mistaken pre-tool context, observes the tool response, and assigns positive credit to the later repair segment without treating the entire response as uniformly good.
+
+
 \bibliography{references}
 \bibliographystyle{iclr2027_conference}
 
