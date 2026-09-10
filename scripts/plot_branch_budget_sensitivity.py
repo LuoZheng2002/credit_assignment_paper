@@ -62,12 +62,12 @@ def main() -> None:
         linewidth=1.8,
         markersize=5,
         color="#d62728",
-        label="Serious-test macro",
+        label="Held-out test macro",
     )
 
     left_axis.set_xlabel("Total trajectories / leaves per tree")
     left_axis.set_ylabel("Best validation gain (points)", color="#1f77b4")
-    right_axis.set_ylabel("Serious-test macro accuracy (%)", color="#d62728")
+    right_axis.set_ylabel("Held-out test macro accuracy (%)", color="#d62728")
     left_axis.tick_params(axis="y", labelcolor="#1f77b4")
     right_axis.tick_params(axis="y", labelcolor="#d62728")
     left_axis.set_xticks(leaves)

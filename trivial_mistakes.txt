@@ -1,0 +1,114 @@
+Yes. I read through the full 17-page version, including the main text, tables, figures, and appendices. There are several things I would fix before submission. Most are not fatal, but a few could make a reviewer think the paper is less polished or methodologically less precise than it actually is.
+
+The most important issue is not grammar—it is the use of **“on-policy.”** In Related Work you write:
+
+> “By contrast, TreeMAPPO is on-policy and reference-free: the tree is constructed directly from the policy’s own rollouts...” 
+
+But later you explicitly say that the primary experiments use a **split one-shot protocol**: rollouts are generated once from the base policy and then LoRA is trained for multiple epochs without refreshing the rollouts.  Strictly speaking, after the policy changes, those data are no longer on-policy. A knowledgeable RL reviewer could immediately flag this. I would change the sentence to something like:
+
+> “By contrast, TreeMAPPO constructs its trees directly from the behavior policy’s own rollouts, without offline teacher-generated trees, reward models, or process-level supervision.”
+
+Or, if you really want to use “on-policy”:
+
+> “Tree construction itself uses on-policy samples from the rollout policy, although our split training experiments reuse the resulting trajectories across multiple optimization epochs.”
+
+That distinction is important.
+
+There are also a number of smaller but very visible issues:
+
+* **“TreeMAPPOgives” / “TreeMAPPOis” missing spaces** in Table 1.  These are straightforward typos and definitely should be fixed.
+* **“maximum-a-posteriori posterior model”** in the abstract is redundant and sounds strange: “posteriori posterior.”  Better: “a statistically grounded MAP estimator” or “a probabilistic latent-variable model fit by maximum a posteriori estimation.”
+* **“Current results show…”** in the abstract makes the paper sound unfinished.  Unless experiments are genuinely still running at submission, write simply “Results show…”.
+* **“The methodology notes propose…”** is particularly abnormal wording for a finished paper.  It sounds as though the manuscript was generated from internal research notes and the method itself has not been finalized. I would replace it with either “We additionally apply…” if it was actually implemented, or remove the sentence if it was only proposed but not used.
+* There is a recurring use of **“current implementation,” “current configs,” “current runs,” “current recipe,” “available at submission time”**. Individually these are fine, but collectively they make the manuscript feel like a progress report rather than an ICLR paper. For example, the Results section says “the audited experiment inventory available at submission time.”  I would simply say “We report the completed experiments…” or “We report results across…”.
+* **“serious test / serious-test”** is very unusual academic terminology. You use it extensively, e.g. “held-out serious tests,” “main serious-test macro accuracies,” etc.  A reviewer may wonder what a “non-serious test” is. I strongly recommend replacing this throughout with something like **“held-out test,” “generalization test,” “extended test suite,” “six-dataset test suite,”** or **“OOD-inclusive test suite.”**
+
+There is also some wording that sounds more like internal experiment documentation than paper prose. For instance:
+
+> “when the repaired per-trial results are available” 
+
+and Table 5 says:
+
+> “repaired per-trial, per-dataset results under the current judging/scoring path.” 
+
+“Repaired” is concerning. A reviewer could reasonably ask: **What was broken? Why did results need repair? Did the repair happen before or after inspecting outcomes?** If this refers to correcting an evaluation-script bug, explain that explicitly and neutrally in the appendix, e.g.:
+
+> “All results were recomputed after correcting an evaluation bookkeeping bug affecting per-trial aggregation.”
+
+If it just means the results were rerun successfully, don't use “repaired.”
+
+Another phrase I would reconsider is:
+
+> “statistically grounded maximum-a-posteriori posterior model” 
+
+Beyond the redundancy, **“statistically grounded”** is a slightly promotional claim. The MAP estimator is mathematically defined, so there is no need for the adjective. “Probabilistic MAP estimator” is cleaner and more defensible.
+
+There are a couple of places where the claims are slightly stronger than the evidence. The Discussion says:
+
+> “This explains why the case study and the strongest Qwen3 tool result favor TreeMAPPO...” 
+
+The experiments are consistent with this explanation, but they do not really establish that tool-mediated error–repair dynamics **explain** the improvement. I would use **“may help explain”** or **“is consistent with.”**
+
+Similarly:
+
+> “the forced-token mechanism improves validation over the non-forced version, supporting the default intervention design...” 
+
+But Appendix Table 6 shows that although forced branching improves validation in both Qwen2.5 settings, the tool-setting test performance is actually substantially better for non-forced branching: 0.5962 versus 0.5836.  You do acknowledge that later, but I would soften the main-text wording:
+
+> “Forced-token branching improves validation in this comparison, motivating its use as the default, though this advantage does not consistently transfer to the held-out test suite.”
+
+That would be harder for a reviewer to attack.
+
+There is also an acronym issue worth considering. **MAPPO is already an extremely well-known acronym for Multi-Agent Proximal Policy Optimization.** Calling your method **TreeMAPPO = Tree-based Maximum-A-Posteriori Policy Optimization** is likely to cause confusion, especially because your method is not multi-agent. This isn't technically an error, but I would seriously consider whether the name is worth the ambiguity. Reviewers searching “MAPPO” will overwhelmingly associate it with multi-agent RL. If the title is not locked, something like **TreeMAP**, **TreeMAP-RL**, **TreeMAPO**, or another name might avoid unnecessary confusion.
+
+One methodological-description inconsistency also stood out. Section 4.4 says:
+
+> “The current implementation chooses branch points before leaf judgments are available. Branching therefore relies on rollout structure and model-side token statistics rather than posterior uncertainty.” 
+
+But in Section 4.1 you say:
+
+> “Posterior estimates are transformed into branching scores for future expansions and into training advantages...” 
+
+Those two statements appear inconsistent. If **all branch points are selected before leaf judgments**, posterior estimates cannot guide “future expansions” within that same tree. If posterior scores are only used in some iterative variant not used in the experiments, say so. Otherwise change Section 4.1 to:
+
+> “Posterior estimates are transformed into training advantages, while branch selection in the current split implementation uses structural and model-probability scores.”
+
+This is probably the clearest actual internal inconsistency I noticed.
+
+Another potential wording problem is the use of **“reference-free.”** The paper does use ground-truth final answers for correctness judgments.  So “reference-free” could be interpreted as “no answer reference,” which is not true. I understand that you mean no reference policy / teacher model / process reward model, but I would define it explicitly the first time:
+
+> “reference-policy-free”
+
+or
+
+> “teacher-free”
+
+depending on what you mean. Otherwise a reviewer may say, “How is it reference-free if ground-truth answers determine rewards?”
+
+There are also two presentational things that struck me as noticeably unusual. Figure 1 contains the sentence **“And then do the training.”**  That is too casual for a paper figure. Change it to something like **“Optimize the policy using the generated training trajectories.”** The figure title itself says **“The Tree Maximum-A-Posteriori Algorithm,”** whereas the method is TreeMAPPO; I would keep naming completely consistent.
+
+The case-study language has a tiny formatting issue too:
+
+> “after the tool returns 9, the later segment repairs the answer to 9 .” 
+
+There is an extra space before the period. The same occurs again in the appendix: “corrects the final answer to 9 .” 
+
+One more phrase that sounds odd is:
+
+> “A representative ... trajectory shows **why segment-level credit is useful**.” 
+
+A single cherry-picked example cannot really “show” usefulness. Better:
+
+> “A representative trajectory illustrates the type of error–repair structure that segment-level credit can distinguish.”
+
+That sounds much more academically careful.
+
+Overall, I would rank the problems like this:
+
+**Definitely fix before submission:** the on-policy claim; the Section 4.1 vs. 4.4 branching inconsistency; “methodology notes propose”; “repaired results”; “serious test”; missing spaces in Table 1; “maximum-a-posteriori posterior”; and the casual Figure 1 wording.
+
+**Strongly consider fixing:** MAPPO acronym collision; “reference-free”; excessive “current/submission-time” wording; causal-sounding “This explains why”; and claims around forced-token superiority.
+
+The core paper itself does **not** read as obviously nonsensical or riddled with grammatical errors. The bigger problem is that a few phrases make it sound like an internal experimental report that was converted into a paper late in the process. Cleaning those up would make it feel substantially more mature.
+
+If I were doing a final ICLR polish pass, I would probably focus next on **line-by-line wording in pages 1–9 only** and mark sentences as **“must change / awkward / fine”**. That would catch the remaining reviewer-visible language issues without spending time polishing appendix prose.

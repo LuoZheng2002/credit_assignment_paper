@@ -1,0 +1,271 @@
+Yes. Looking at the current 11-page main text, I think getting it down to **9 pages is very feasible without weakening the technical contribution**. The main issue is not that the paper contains too much essential methodology; rather, several things currently in the main text are better suited to the appendix, and there is substantial repetition among Results, Analysis, Discussion, and Limitations.
+
+My suggested target would be to remove **~1.2–1.4 pages structurally** and obtain another **~0.6–0.8 pages through rewriting/condensation**.
+
+### Highest-priority cuts
+
+| Priority | Current content                    | Recommendation                                                            |        Est. saving |
+| -------- | ---------------------------------- | ------------------------------------------------------------------------- | -----------------: |
+| **1**    | Fig. 3 exact tool prompt on p. 9   | **Move entirely to appendix**                                             |         ~0.45 page |
+| **2**    | Fig. 4 full case study on p. 10    | Move figure to appendix; retain 3–5 sentence case-study summary           |    ~0.45–0.55 page |
+| **3**    | Sections 8 Analysis + 9 Discussion | Merge into one short **Discussion** section                               |      ~0.4–0.6 page |
+| **4**    | Related Work                       | Compress substantially, especially peripheral process/tool-use literature |      ~0.4–0.5 page |
+| **5**    | Experimental setup                 | Push operational details to Appendix A                                    |      ~0.2–0.3 page |
+| **6**    | Limitations                        | Compress 4 bullets into one paragraph                                     |         ~0.15 page |
+|          | **Likely total**                   |                                                                           | **~2.1–2.6 pages** |
+
+That gives you enough margin that you do not need to touch the central MAP equations or the principal results table.
+
+## 1. Move Figure 3 out of the main paper immediately
+
+This is probably the easiest cut.
+
+Page 9 devotes almost half a page to the **exact Qwen tool-enabled prompt**, including the full Python example. 
+
+But you already have **Figure 7 in Appendix G showing the exact tool and no-tool prompts**. 
+
+So Figure 3 is essentially reproducibility material rather than something necessary to understand TreeMAPPO.
+
+I would replace the whole figure with one sentence in Experimental Setup or the case study:
+
+> The exact tool-enabled and no-tool prompts, including chat-template markers and executor instructions, are provided in Appendix G.
+
+This is a nearly free **~0.4–0.5 page saving**.
+
+---
+
+## 2. Keep the case study idea, but move the large trajectory figure to the appendix
+
+I would **not remove the tool-use case study concept**, because it is one of the intuitively strongest parts of the paper. It directly motivates why intra-trajectory credit is useful: the model makes an error, receives a correct tool result, and repairs its answer.
+
+Your current Section 7.5 already summarizes the important observation quite efficiently:
+
+> incorrect boxed answer → tool returns 9 → model repairs answer → early segment receives negative credit and later repair receives positive credit. 
+
+But page 10 then spends roughly half a page displaying the entire raw trajectory again as Figure 4. 
+
+I would therefore keep **Section 7.5 in the main text**, but reduce it to something like:
+
+> **Tool-use case study.** A representative Qwen2.5-7B trajectory illustrates the advantage of segment-level credit. The model initially derives the correct equation but outputs an incorrect answer before incorporating the Python result. After observing the tool response \(9\), it repairs the solution. TreeMAPPO assigns weak negative credit to the erroneous pre-tool span and positive credit to the post-tool repair (\(-0.114,+0.222,+0.635,+0.635,+0.576\)). The complete colored trajectory is shown in Appendix G.
+
+That is enough for the argument.
+
+Move Figure 4 beside the existing qualitative examples in Appendix G. Since Appendix G already contains considerably more detailed trajectory analysis, this actually makes the organization cleaner. 
+
+**Saving: another ~0.5 page.**
+
+At this point, you're already almost one page down.
+
+---
+
+# 3. Merge Sections 8 “Analysis” and 9 “Discussion”
+
+This is probably the **largest textual redundancy** in the current paper.
+
+Section 8 says:
+
+* tree methods trade inference budget for fine-grained credit;
+* segmented credit seems particularly useful with tools;
+* method effectiveness depends on whether the tree exposes meaningful contrast;
+* different branching/credit schemes work in different circumstances. 
+
+Then Section 9 says again:
+
+* TreeMAPPO turns sparse outcomes into dense supervision;
+* benefits depend on foundation model/tool context;
+* Qwen3 tool is strongest;
+* Qwen2.5/Mistral illustrate limitations;
+* branching/training/tool-use design choices matter. 
+
+And page 11 continues with four bullets reiterating branching, clipped token-level training, tool/no-tool differences, and forced-token branching. 
+
+These ideas are useful, but they do not need **two full sections plus bullets**.
+
+I would create:
+
+### 8 Discussion
+
+with only **three paragraphs**:
+
+**Paragraph 1 — empirical interpretation**
+TreeMAPPO helps when local branches expose meaningful correctness contrast; otherwise the extra granularity gives little benefit.
+
+**Paragraph 2 — why tools matter**
+Tool trajectories naturally contain error → feedback → repair transitions, which explains the especially strong Qwen3 tool result and motivates fine-grained credit.
+
+**Paragraph 3 — practical trade-off**
+TreeMAPPO spends more rollout compute and introduces variable-advantage optimization, so it should be viewed as complementary to GRPO rather than universally superior.
+
+The four design-choice bullets currently at the beginning of page 11 are mostly repetitions of Method §4.4–4.6 and can simply disappear.
+
+That should turn roughly **1.3 pages of Analysis + Discussion** into perhaps **0.65–0.75 page**.
+
+**Saving: ~0.5 page**, possibly more.
+
+---
+
+# 4. Related Work is currently too detailed for a 9-page ICLR paper
+
+Your Related Work occupies most of pages 2–4. It is thorough, but at the moment it reads closer to a literature survey than what the paper needs.
+
+For example, the paper individually explains PPO, GRPO, process supervision, Math-Shepherd, Self-Explore, PRIME, PURE, TEMPO, SPO, TreeRL, TreeRPO, TreePO, TreeAdv, Tree-OPO, GRPO-\(\lambda\), OAR, OPPO, GiGPO, APPO, PAL, PoT, ReAct, and Toolformer.  
+
+You don't need to remove the citations. You can **group the papers by family instead of explaining each one**.
+
+For example, the process-supervision paragraph could go from ~9 lines:
+
+> Process supervision and verifier-based credit... Let’s Verify Step by Step... Math-Shepherd... Self-Explore... PRIME... PURE...
+
+to ~3–4 lines:
+
+> **Process-level supervision.** Prior work densifies outcome supervision using human or automatically constructed step labels, learned process verifiers, error localization, or implicit process rewards (Lightman et al., 2023; Wang et al., 2024; Hwang et al., 2024; Cui et al., 2025; Cheng et al., 2025). TreeMAPPO instead derives local credit solely from terminal correctness across deliberately branched policy trajectories.
+
+The same can be done with the tree-based paragraph.
+
+I'd retain the most detail for the papers reviewers are most likely to compare directly against you:
+
+**TEMPO, TreeRPO, TreeRL, TreePO/TreeAdv, APPO**, perhaps SPO.
+
+And compress:
+
+* general PPO/GRPO background;
+* process reward-model literature;
+* PAL / PoT / ReAct / Toolformer;
+* the flat token-credit methods into one sentence.
+
+The final **“Tool-augmented mathematical reasoning and benchmarks”** paragraph is particularly movable/condensable because much of it provides general tool-use context rather than distinguishing TreeMAPPO. 
+
+I think Related Work can go from roughly **1.7 pages to ~1.2 pages** without sacrificing citation coverage.
+
+**Saving: ~0.4–0.5 page.**
+
+---
+
+# 5. Experimental Setup contains appendix-level implementation details
+
+Section 6 currently explains your split one-shot pipeline twice at substantial length.
+
+You state:
+
+> four stages: base-policy rollout collection, training-set generation, adapter training, checkpoint validation... 
+
+Then explain why it differs from fully online RL, why it is cheaper, how the code also supports an orchestrator mode, etc. 
+
+Then there is another paragraph explaining the rollout-budget balancing and the 8-versus-16 trajectory calculation. 
+
+Appendix A already contains the exact 250 vs. 125 question accounting, 2,000 leaves, timing audit, learning rate, LoRA rank, etc. 
+
+I would keep only something like:
+
+> We use a split one-shot protocol: rollouts are collected from the base policy, TreeMAPPO advantages are generated once, and LoRA adapters are trained for multiple epochs before validation. GRPO and tree conditions are matched by pre-filter rollout budget; Appendix A provides chunk sizes, hyperparameters, timing audits, and dataset construction details.
+
+That replaces about **15 lines with 4–5 lines**.
+
+One important point should remain in the main paper: this is **not fully online RL**. Reviewers need to know that immediately. But the operational explanation can go.
+
+**Saving: ~0.25 page.**
+
+---
+
+# 6. Compress the Baselines and Ablations descriptions
+
+Section 5 currently gives fairly verbose definitions of each ablation and then explicitly explains that these aren't merely renamed conditions. 
+
+The distinction is important, but it can fit in a compact table:
+
+| Variant       | Branching          | Credit              |
+| ------------- | ------------------ | ------------------- |
+| GRPO          | None               | trajectory reward   |
+| TreeMAPPO     | guided token       | MAP                 |
+| TEMPO-style   | spontaneous prefix | MAP                 |
+| TreeRPO-style | guided token       | child-group outcome |
+| TreeRL-branch | entropy            | MAP                 |
+| TreeRL-credit | guided token       | local–global        |
+
+Then one sentence:
+
+> These ablations independently vary exploration and credit estimation.
+
+This would actually make the experimental logic **easier to understand than the existing bullets**, while probably saving 6–10 lines.
+
+---
+
+# 7. Section 7.1 can be cut heavily because the detailed validation results are already in the appendix
+
+The validation subsection currently contains quite a lot of prose describing individual model trends:
+
+> Qwen2.5 modest gains... Qwen3 stronger... Llama improves then regresses... Gemma and Mistral... checkpoint selection... 
+
+But the actual main claim rests more strongly on the serious-test Table 1, and full validation inventory is already in Appendix B/Table 2. 
+
+I would reduce §7.1 to one paragraph:
+
+> Across held-out validation, both GRPO and TreeMAPPO generally improve over their respective base checkpoints, although gains are modest and non-monotonic across epochs. Qwen3-4B exhibits the strongest tool-use improvements, while model-family sensitivity remains substantial. Full validation trajectories and checkpoint-selection results are reported in Appendix B.
+
+Also, your sentence
+
+> “Figure 5 in Appendix B visualizes…”
+
+means that the main text does not even contain the figure anymore, so there is little reason to spend much main-text space narrating it. 
+
+---
+
+# 8. Limitations should be one compact paragraph
+
+The current four bullets occupy around a quarter page. 
+
+These can become approximately:
+
+> **Limitations.** TreeMAPPO incurs additional rollout cost and is evaluated primarily in a split one-shot rather than fully online training regime. Gains are modest and transfer unevenly across models and datasets, motivating larger-scale online experiments and independent seeds. Finally, the MAP estimator assumes additive segment contributions and relies on final-answer extraction, assumptions that may become restrictive in more complex agentic environments.
+
+Same substantive content, around half the space.
+
+---
+
+# What I would **not** cut
+
+I would protect four things quite strongly.
+
+**First, keep Figure 1.** It is your primary overview and earns its space. The paper introduces several nonstandard components—trunks, token-level branching, MAP credit, flattening—and Figure 1 makes that pipeline legible. 
+
+**Second, keep the MAP formulation, Eqs. 1–5.** This is probably the most distinctive mathematical contribution. 
+
+**Third, keep the branching-score description and forced-token mechanism.** This separates your method from just “construct a tree and assign credit.” 
+
+**Fourth, keep Table 1 in the main text.** It communicates the most important empirical message—including the fact that the method is not universally superior—which makes the paper more credible. 
+
+I would also **keep one sentence or short paragraph about the case study**, because the tool-feedback → repair example provides perhaps the clearest conceptual justification for TreeMAPPO. Just don't spend a full page across Figures 3 and 4 demonstrating it.
+
+---
+
+# A 9-page structure I would aim for
+
+Something approximately like this:
+
+**p. 1:** Abstract + Introduction
+**p. 2:** Intro Figure 1 + condensed Related Work
+**p. 3:** Related Work + Problem Setting + start Method
+**p. 4:** MAP credit model
+**p. 5:** Branching + training advantages + training-set construction
+**p. 6:** Baselines/Ablations + Experimental Setup
+**p. 7:** Table 1 + Results
+**p. 8:** Ablations + short case study + Discussion
+**p. 9:** Discussion + Limitations + Conclusion
+
+That would feel like a fairly standard, focused ICLR paper.
+
+In particular, I would try to make **the Method approximately pages 3–6 and Results approximately pages 7–9**. Right now, the exact prompt and case-study visualization are consuming precious main-text space that could otherwise let the technical story breathe.
+
+### If you need to cut exactly two pages with minimum rewriting
+
+My order would be:
+
+1. **Remove Figure 3 → Appendix:** −0.4–0.5 p
+2. **Remove Figure 4 → Appendix, retain 1 paragraph:** −0.4–0.5 p
+3. **Merge Analysis + Discussion:** −0.4–0.5 p
+4. **Condense Related Work:** −0.35–0.45 p
+5. **Shorten Experiment Setup / Limitations / validation prose:** −0.3–0.4 p
+
+That gets you to roughly **−2.0 to −2.3 pages**, while preserving essentially every substantive result and all of the core method.
+
+One additional observation: I would actually regard moving the two case-study figures as an **improvement to the paper independent of the page limit**. Exact prompts and long raw trajectories are excellent appendix/reproducibility material; in the main paper, the valuable thing is the *scientific observation they demonstrate*, not the verbatim content itself.
