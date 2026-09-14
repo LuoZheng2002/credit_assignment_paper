@@ -64,6 +64,8 @@ Structured-rollout methods obtain intermediate credit from shared prefixes, flex
 
 \ours\ is closest to this family, but its differentiating claim is not tree construction alone. It combines model-plausible token-level counterfactual interventions with a joint MAP estimator over latent signed segment contributions and uncertainty, rather than relying on incidental prefix overlap, Monte Carlo segment differences, entropy-only branching, empirical child-group rewards, or direct leaf-advantage redistribution.
 
+Several of these systems report larger gains than ours under their own full training stacks; Table~\ref{tab:related-reported-results} summarizes representative numbers and why they are not directly comparable. We do not include full SPO-tree or TreePO reproductions because their methods are coupled to segment-synchronous rollout schedulers, fallback/replay rules, and objective-specific masking or subgroup normalization, rather than being drop-in replacements for our branching or advantage modules.
+
 \paragraph{Prefix-aware and off-policy tree supervision.}
 Tree-OPO \cite{treeopo2025} uses teacher-generated MCTS prefixes and staged advantage estimation to create prefix-aware off-policy training groups. By contrast, \ours\ constructs its trees from behavior-policy rollouts and is reference-policy-free: it does not require a reference policy, offline teacher trees, reward models, or process-level supervision. Our split-pipeline experiments reuse these rollouts across optimization epochs, so the training phase is not fully online or strictly on-policy after the adapter changes.
 
@@ -102,6 +104,7 @@ Branching is token-level rather than step-level. A new branch can be created in 
 \end{itemize}
 
 Each branch preserves the prefix before the selected token position and then creates a new continuation from that point. This construction makes a tree node correspond to an actual intervention in the model's decoded trajectory rather than to a manually annotated reasoning step. Appendix~\ref{app:implementation-protocol} reports the concrete branch budgets and decoding settings used in experiments.
+Appendix Table~\ref{tab:guided-branching-pseudocode} gives implementation-aligned pseudocode for guided branch construction.
 
 \subsection{MAP Credit Assignment Model}
 Let $\ell$ index judged leaves and let $i$ index non-prompt segments. For each leaf $\ell$:
@@ -150,7 +153,8 @@ For segment splitting, the structural penalty increases with the shorter side of
 After a branch point and alternative token are selected, the current guided-branching implementation forces that selected token to be the first token of the new branch continuation. This makes the token-level branch explicit rather than merely restarting generation from the shared prefix and hoping that sampling chooses the intended alternative. We keep the non-forced version as an ablation, but use the forced-token version as the default because it better matches the intended token-level intervention.
 
 \subsection{From Posterior Scores to Training Advantages}
-After tree construction, each segment receives an unnormalized signed score proportional to $m_i / \exp(u_i)$. We additionally apply length-aware rescaling to reduce volatility from very short reasoning spans. The generated training samples then attach token-level advantage values aligned with the input sequence.
+After tree construction, each non-root segment receives a signed posterior score $m_i / \exp(u_i)$, where $m_i$ is the inferred mean contribution and $\exp(u_i)$ is the inferred standard deviation. The implementation then applies the same deterministic conversion chain used in the reported runs: divide by a clamped reasoning-token segment length, standardize scores within the tree, set a score to zero if mean subtraction would flip its sign, divide each shared segment score by the number of leaf trajectories that contain it, balance the total positive and negative advantage mass over the generated training set, and finally clip token-level advantages to $[-3,3]$ before optimization. The generated training samples attach these token-level advantage values aligned with the input sequence.
+Appendix Table~\ref{tab:map-optimization-pseudocode} gives pseudocode for the MAP optimization and advantage conversion used by the generation phase.
 
 The downstream training code consumes aligned token sequences, supervised target tokens, attention masks, token-level advantages, and old token log probabilities. The loss is a clipped policy-ratio surrogate over supervised positions,
 \begin{equation}
@@ -164,13 +168,13 @@ The downstream training code consumes aligned token sequences, supervised target
 where $\mathcal{S}$ denotes supervised token positions, $\rho_t$ is the ratio between the current token probability and the stored old token probability, and $\tilde{A}_t$ is the token advantage clipped to $[-3,3]$. This is the implemented optimization interface for injecting segment-level credit into model updates while avoiding the unbounded negative-advantage objective that arises from direct advantage-weighted cross entropy.
 
 \subsection{Training-Set Construction}
-Because many tree leaves share prefixes, naively flattening all leaves would over-train shared segments. We therefore use a greedy de-duplication policy.
+Because many tree leaves share prefixes, naively flattening all leaves would duplicate the same segment-level credit across descendant trajectories. We therefore preserve all informative leaves while normalizing the credit assigned to shared segments.
 \begin{enumerate}
-    \item Score each candidate leaf trajectory by average absolute token advantage.
-    \item Select the strongest candidate.
-    \item Mark its segments as consumed.
-    \item Repeat among trajectories that still contain unconsumed learnable segments.
-    \item Aggregate selected trajectories across trees and prune the tail with a cumulative average-absolute-advantage cutoff.
+    \item Discard trees whose leaves are uniformly correct or uniformly incorrect, since they provide no contrastive signal for segment-level credit.
+    \item Compute segment advantages from the chosen credit estimator after leaf judgments are attached.
+    \item For each segment, count how many completed leaf trajectories contain it and divide that segment's advantage by this count.
+    \item Emit each remaining leaf trajectory with token-level advantages inherited from its segments, so shared prefixes contribute a fixed total amount of training signal rather than being multiplied by the number of descendants.
+    \item Aggregate emitted trajectories across questions under the fixed ordering used by the training pipeline.
 \end{enumerate}
 
 Selected trajectories are then emitted under a fixed batching convention so sibling positive and negative samples from the same problem are consumed consecutively; this ordering is an implementation detail rather than an experimental variable.
@@ -183,11 +187,11 @@ We evaluate \ours\ and matched baselines on Qwen2.5-7B, Qwen3-4B, Gemma-3-4B, Mi
 
 The primary experiments use a split one-shot protocol: rollouts are collected from the base policy, advantage-weighted training data are generated once, and LoRA adapters are trained for multiple epochs before checkpoint validation. This differs from fully online RL, where each policy update would trigger fresh rollouts from the latest checkpoint. The split protocol is less expensive, easier to audit, and better suited to controlled comparisons under limited queue and GPU budgets; it primarily tests the quality of the generated credit-assignment data rather than full closed-loop policy-improvement dynamics.
 
-To reduce compute-budget confounds, GRPO and tree conditions are matched by pre-filter rollout budget. In the main 8-leaf GRPO versus 16-leaf tree comparison, GRPO receives twice as many raw questions per epoch so both settings target the same number of generated leaf trajectories before correctness filtering. Appendix~\ref{app:implementation-protocol} gives dataset construction, chunk sizes, timing audits, hyperparameters, and validation cadence.
+To reduce compute-budget confounds, GRPO and tree conditions are matched by pre-filter rollout budget. In our pipeline, inference-time rollout dominates wall-clock and GPU allocation: generating multiple long reasoning trajectories is substantially more expensive than adapter updates on the resulting filtered training set. Moreover, filtering intentionally removes many zero-signal cases, especially questions whose leaves are uniformly correct or uniformly incorrect. We therefore model the primary computation budget as the number of trajectories generated before filtering. In the main 8-leaf GRPO versus 16-leaf tree comparison, GRPO receives twice as many raw questions per epoch so both settings target the same number of generated leaf trajectories before correctness filtering. This does not guarantee identical effective update mass after all-correct/all-incorrect filtering, shared-segment advantage normalization, and advantage clipping; it instead matches the dominant inference-rollout cost. Appendix~\ref{app:implementation-protocol} gives dataset construction, chunk sizes, timing audits, hyperparameters, validation cadence, and an advantage-scale audit.
 
 
 \section{Results}
-We report results across all completed experimental conditions. All held-out test rows in the main tables use five rollout trials and all six test datasets; held-out validation rows use six trials. We emphasize conservative conclusions: the evidence supports modest and repeatable validation improvements, but the broader held-out tests show that these gains do not always transfer uniformly.
+We report results across all completed experimental conditions. Training rollouts use $T=0.7$; all validation and held-out test rollouts are decoded greedily ($T=0$) with one trajectory per question. Intervals over ``trials'' quantify run-to-run variability of the inference and judging pipeline, not policy sampling variance, and not variance over independently seeded training runs. All held-out test rows in the main tables use five rollout trials and all six test datasets; held-out validation rows use six trials. We emphasize conservative conclusions: the evidence supports modest and repeatable validation improvements, but the broader held-out tests show that these gains do not always transfer uniformly.
 
 \subsection{Validation Accuracy Trends}
 Held-out validation shows that both GRPO and \ours\ can extract signal from the split pipeline, although gains are modest and non-monotonic across epochs. Qwen3-4B has the strongest tool-use improvements, while Gemma and Mistral highlight substantial model-family sensitivity. Full validation inventories and the central Qwen2.5-7B no-tool trend are deferred to Appendix~\ref{app:validation-inventory}.
@@ -219,7 +223,7 @@ Llama-3.1 no-tool & 0.3930 & 0.4115 & \best{0.4167} & Both methods improve over 
 The held-out tests sharpen the qualitative picture. In no-tool Qwen2.5-7B, validation gains do not reliably transfer to the broader six-dataset macro average. In tool-enabled Qwen2.5-7B, both trained methods improve over base by about one point, with \ours\ close to GRPO. Qwen3-4B is the strongest positive setting: both methods improve in no-tool testing, and \ours\ substantially outperforms GRPO in the tool setting. Gemma and Llama provide additional positive evidence for \ours\ over their base models, while Mistral remains unstable under this training recipe.
 
 \subsection{Ablation Study}
-The main ablation plan separates branching policy from credit estimation. The TEMPO-style condition changes the branch source to spontaneous shared-prefix divergence. The TreeRPO-style condition changes only the segment-credit estimator to child-group win-rate comparison. The two TreeRL-style conditions separately test entropy-guided branching and local--global value-difference credit. Guided-branching experiments use forced selected branch tokens by default; non-forced branching is retained only as a mechanism ablation.
+We organize mechanism analysis into two categories. The first category consists of ablations that are compatible with our algorithmic framework and can be implemented by changing one localized component, making them useful for isolating the effect of individual mechanisms rather than reproducing an entire external system. These ablations separate branching policy from credit estimation: the TEMPO-style condition changes the branch source to spontaneous shared-prefix divergence; the TreeRPO-style condition changes only the segment-credit estimator to child-group win-rate comparison; and the two TreeRL-style conditions separately test entropy-guided branching and local--global value-difference credit. Guided-branching experiments use forced selected branch tokens by default; non-forced branching is retained only as a mechanism ablation.
 
 \begin{table}[t]
 \centering
@@ -247,6 +251,8 @@ Branch budget 32 & 60 & \acc{0.6428}{0.0026} & \acc{0.6503}{0.0041} & +0.0075 & 
 
 Table~\ref{tab:ablation-results} shows that most tree-structured variants improve on their own validation baselines, but the strongest validation gain does not automatically yield the strongest broad test result. TEMPO-style branching has the largest validation gain, suggesting that natural prefix diversity already exposes useful alternatives in this no-tool setting. TreeRPO-style credit is close in validation but weaker on the six-dataset test, indicating that coarse child-group outcome comparisons can overfit the validation distribution. The TreeRL-style credit and combined variants have comparatively strong held-out test macro averages, while entropy-only branching is weaker, suggesting that credit estimation is at least as important as branch-location selection. The forced-token mechanism improves validation over the non-forced version, motivating the default intervention design, although this advantage does not consistently transfer to the held-out test suite.
 
+The second category consists of closely related systems whose core mechanisms are either orthogonal to \ours\ or too tightly coupled to their own training stacks to reproduce within our framework without major infrastructure changes. For SPO-tree, TreePO, TreeAdv, APPO, GRPO-$\lambda$, OAR, and LamPO, a same-hyperparameter replication would not isolate a single shared mechanism and would be dominated by differences in online rollout scheduling, evaluator design, objective details, or training scale. We therefore report their working principles and claimed improvements as coarse context in Appendix Table~\ref{tab:related-reported-results}, rather than treating them as directly comparable baselines.
+
 \subsection{Stability Diagnostics}
 Several completed runs are negative results that shape our conclusions. They indicate that the method is sensitive to optimizer aggressiveness, adapter configuration, and model family, motivating the conservative settings used in the main tables. Appendix~\ref{app:stability-diagnostics} summarizes the concrete failed and unstable settings.
 
@@ -258,6 +264,8 @@ A representative Qwen2.5-7B tool-enabled \ours\ trajectory illustrates the type 
 \section{Discussion}
 The results point to a trade-off among credit granularity, rollout budget, and optimization stability. GRPO is inexpensive and stable because it assigns one group-normalized terminal signal to full responses, but this simplicity can blur late repairs and intermediate mistakes. Tree-based methods spend more inference budget to expose local alternatives and then train on variable segment-level advantages; this helps when the tree contains meaningful correctness contrasts, but can introduce higher-variance updates when branches fragment unimportant regions or the model family is adapter-sensitive.
 
+This also connects to recent observations that saturated reasoning data can be ``too correct to learn'' \cite{cuts2026}. In our setting, only mixed-correctness trees provide informative contrast for segment-level credit: if all leaves for a question are correct or all are incorrect, the tree contains little supervised evidence about which local segment caused success or failure. Appendix Table~\ref{tab:mixed-correctness-efficiency} shows that only 36--53\% of TreeMAPPO training-rollout questions yield mixed-correctness trees in the reported settings. This partially explains why reference-policy-free RL from terminal correctness is difficult and why the overall improvements remain modest when many questions produce uniform outcomes.
+
 Tool use appears to make segmented credit more valuable. Tool trajectories can contain error--feedback--repair transitions, where early reasoning is harmful but later tool-informed reasoning is helpful. This is consistent with the case study and the strongest Qwen3 tool result favoring \ours, and motivates analyzing tool-enabled settings separately from no-tool reasoning.
 
 The ablation results should therefore be read as a method-characteristic map rather than a single global ranking. Spontaneous or entropy-based branching can work when models naturally produce diverse alternatives, while guided token branching is more useful when plausible but under-sampled decisions matter. Win-rate and local--global backups can be competitive when correctness changes align with large subtree boundaries, whereas the MAP estimator is better matched to cases where several shared segments jointly explain mixed descendants.
@@ -265,7 +273,7 @@ The ablation results should therefore be read as a method-characteristic map rat
 Several implementation choices follow from this interpretation. Branch selection currently relies on structural penalties and alternative-token probability rather than posterior uncertainty, because judgments are produced after tree construction in the split pipeline. The training loss uses a clipped policy-ratio surrogate with token-level advantages, keeping the optimization interface close to standard policy-gradient practice while preserving tree-based credit assignment. The forced-token branch variant is the default because the branch score evaluates a specific alternative token, so forcing that token makes the generated intervention match the scored decision.
 
 \section{Limitations and Future Work}
-TreeMAPPO incurs additional rollout cost and is evaluated primarily in a split one-shot rather than fully online training regime. Gains are modest and transfer unevenly across models and datasets, motivating larger-scale online experiments, stronger optimizer controls, and repeated independent seeds. The MAP estimator also assumes additive segment contributions and relies on final-answer extraction, assumptions that may become restrictive in more complex agentic environments.
+TreeMAPPO incurs additional rollout cost and is evaluated primarily in a split one-shot rather than fully online training regime. Gains are modest and transfer unevenly across models and datasets, motivating larger-scale online experiments, stronger optimizer controls, and repeated independent seeds. The MAP estimator also assumes additive segment contributions and relies on final-answer extraction, assumptions that may become restrictive in more complex agentic environments. Finally, our ablations approximate several related tree-credit ideas within a common rollout and training infrastructure, but they are not full reproductions of SPO-tree or TreePO. Those methods couple their credit estimators to segment-synchronous tree generation, replay or fallback rules, and probability-mask or subgroup-normalized objectives \cite{spo2025,treepo2025}; reproducing them faithfully would require a separate pipeline rather than only swapping the branching or advantage module.
 
 \section{Conclusion}
 We presented \ours, a trajectory-tree method for fine-grained credit assignment in agentic LLM training. The core idea is to branch reasoning trajectories at token granularity, infer segment-level contribution from mixed-success descendants, and convert those estimates into training signals for subsequent optimization. Completed split-pipeline experiments show that \ours\ can outperform baseline methods under some configurations, especially when the foundation model and tool-calling context create recoverable intermediate mistakes. The results also reveal a trade-off among finer credit assignment, additional rollout budget, and training stability on trajectories with variable advantages. We therefore view \ours\ not as a uniformly dominant replacement for GRPO, but as a worthwhile option to try as training scale and computation budget increase, particularly for agentic settings where tool feedback can turn early mistakes into later corrections.
@@ -295,7 +303,47 @@ Each prompt contains the problem statement and, when tool use is enabled, a spec
 In the default configuration for the main tool-using setup, each tree begins with 4 trunk trajectories and expands to 16 total trajectories. Branch-budget ablations use 8 and 32 total trajectories. We keep a fixed decoding temperature within each tree; in the reported configurations, this value is $T=0.7$ for trunk generation, continuation, and branch expansion.
 
 \paragraph{Rollout-budget balancing.}
-For the main chunked comparison, GRPO uses 8 complete leaf trajectories per question, while the tree setting uses 16 leaf trajectories per question. To approximately equalize rollout work per training epoch, we assign GRPO twice as many raw questions per chunk: 250 questions for GRPO and 125 questions for tree rollouts. Thus both settings target 2{,}000 generated leaf trajectories per epoch before correctness filtering. Direct run checks confirm this layout for the Qwen2.5 no-tool run: the first GRPO chunk contains question indices 0--249 with 8 leaves per question, and the first tree chunk contains question indices 0--124 with 16 leaves per question, giving 2{,}000 leaves in both chunks. The first-run timing summaries are also comparable for Qwen2.5: 235 seconds per GRPO no-tool chunk versus 207 seconds per tree no-tool chunk, and 237 seconds per GRPO tool chunk versus 210 seconds per tree tool chunk. After judging and filtering, the number of accepted training trajectories can differ because all-correct and all-incorrect questions are removed, so the fairness claim is about pre-filter rollout budget rather than identical post-filter training-set size.
+For the main chunked comparison, GRPO uses 8 complete leaf trajectories per question, while the tree setting uses 16 leaf trajectories per question. Because rollout inference is the bottleneck, we approximately equalize rollout work per training epoch by assigning GRPO twice as many raw questions per chunk: 250 questions for GRPO and 125 questions for tree rollouts. Thus both settings target 2{,}000 generated leaf trajectories per epoch before correctness filtering. Direct run checks confirm this layout for the Qwen2.5 no-tool run: the first GRPO chunk contains question indices 0--249 with 8 leaves per question, and the first tree chunk contains question indices 0--124 with 16 leaves per question, giving 2{,}000 leaves in both chunks. The first-run timing summaries are also comparable for Qwen2.5: 235 seconds per GRPO no-tool chunk versus 207 seconds per tree no-tool chunk, and 237 seconds per GRPO tool chunk versus 210 seconds per tree tool chunk. After judging and filtering, the number of accepted training trajectories can differ because all-correct and all-incorrect questions are removed. This is expected rather than a failure of the budget model: those removed samples carry no contrastive credit signal, and the scarce resource being controlled is the cost of generating candidate trajectories, not the final number of supervised token updates.
+
+\begin{table*}[t]
+\centering
+\small
+\setlength{\tabcolsep}{3pt}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llrrrrrrr}
+\hline
+Model & Setting & Questions & All correct & All incorrect & Mixed & Filtered & Train traj. & Traj./question \\
+\hline
+Qwen2.5-7B & No-tool & 8{,}750 & 3{,}883 (44.4\%) & 1{,}431 (16.4\%) & 3{,}436 (39.3\%) & 60.7\% & 54{,}976 & 6.3 \\
+Qwen2.5-7B & Tool & 8{,}750 & 3{,}228 (36.9\%) & 1{,}496 (17.1\%) & 4{,}026 (46.0\%) & 54.0\% & 64{,}416 & 7.4 \\
+Qwen3-4B & No-tool & 6{,}250 & 3{,}120 (49.9\%) & 847 (13.6\%) & 2{,}283 (36.5\%) & 63.5\% & 36{,}528 & 5.8 \\
+Qwen3-4B & Tool & 6{,}250 & 2{,}637 (42.2\%) & 934 (14.9\%) & 2{,}679 (42.9\%) & 57.1\% & 42{,}864 & 6.9 \\
+Gemma-3-4B & No-tool & 6{,}250 & 2{,}421 (38.7\%) & 1{,}526 (24.4\%) & 2{,}303 (36.8\%) & 63.2\% & 36{,}848 & 5.9 \\
+Mistral-7B & No-tool & 6{,}250 & 149 (2.4\%) & 3{,}112 (49.8\%) & 2{,}989 (47.8\%) & 52.2\% & 47{,}824 & 7.7 \\
+Llama-3.1 & No-tool & 6{,}250 & 1{,}112 (17.8\%) & 1{,}843 (29.5\%) & 3{,}295 (52.7\%) & 47.3\% & 52{,}720 & 8.4 \\
+\hline
+\end{tabular}
+}
+\caption{Training-rollout correctness breakdown for TreeMAPPO generation runs. ``Filtered'' is the share of questions with all-correct or all-incorrect leaves, which produce no within-question contrastive credit signal and are removed before training trajectory construction. ``Train traj.'' counts accepted leaf trajectories after this question-level filtering.}
+\label{tab:mixed-correctness-efficiency}
+\end{table*}
+
+Table~\ref{tab:mixed-correctness-efficiency} shows that rollout efficiency varies substantially by model family and tool setting. For Qwen2.5-7B and Qwen3-4B, enabling tools reduces the all-correct fraction and increases the mixed-correctness fraction by roughly 6--7 points, consistent with tool feedback creating more recoverable error--repair variation. Across no-tool models, stronger or more saturated models such as Qwen3-4B produce many all-correct trees, while weaker models such as Mistral produce many all-incorrect trees. Llama has the highest mixed-correctness rate in this table, indicating many informative rollouts, but the main results show that informative contrast alone is insufficient without stable optimization and good transfer.
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{lrrrr}
+\hline
+Method & Questions & Train traj. & Mean $|\bar{A}|$ & Median $|\bar{A}|$ \\
+\hline
+GRPO & 17{,}500 & 53{,}200 & 0.825 & 0.577 \\
+\ours & 8{,}750 & 54{,}976 & 0.355 & 0.281 \\
+\hline
+\end{tabular}
+\caption{Training-set advantage-scale audit for Qwen2.5-7B no-tool runs. $|\bar{A}|$ is the absolute average token advantage for an emitted leaf trajectory, as recorded by the generation statistics after shared-segment normalization and token clipping but before final positive/negative mass balancing. The lower mean for \ours\ reflects shared-segment advantage normalization across descendant leaves rather than weaker rollout correctness alone.}
+\label{tab:qwen25-notool-advantage-scale}
+\end{table}
 
 \paragraph{MAP-credit optimization details.}
 The hyperparameter configuration uses $\sigma_m = 1.0$, $\sigma_u = 1.0$, $\varepsilon = 10^{-6}$, 120 optimization iterations, and log-standard-deviation clamps in $[-4,2]$. These settings are fixed across the main TreeMAPPO comparisons unless an ablation explicitly changes the credit-estimation rule.
@@ -475,6 +523,98 @@ Our experimental plan includes 8-, 16-, and 32-trajectory variants for the Qwen2
 \caption{Branching-budget sensitivity for Qwen2.5-7B no-tool TreeMAPPO variants. The validation line reports the best validation improvement over each run's epoch-0 checkpoint; the held-out test line reports the five-trial, six-dataset macro accuracy at the validation-selected checkpoint.}
 \label{fig:branch-budget}
 \end{figure}
+
+\section{Reported Results from Closely Related Systems}
+\label{app:related-reported-results}
+Table~\ref{tab:related-reported-results} summarizes representative improvements reported by closely related fine-grained, tree-based, or group-relative RL systems. We remove implementation-specific caveats from the table itself and state the key qualification here: these results are not directly comparable to our split-pipeline LoRA experiments because they differ in computation budget, training scale, online versus split rollout policy, majority-vote or pass@1 evaluation, datasets, and whether reference trajectories, process signals, or specialized rollout systems are used.
+
+\begin{table*}[t]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{4pt}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{p{0.13\textwidth}p{0.34\textwidth}p{0.44\textwidth}}
+\hline
+Method & Main mechanism & Reported improvement in its paper \\
+\hline
+SPO / SPO-tree \cite{spo2025} & Flexible segment partition, MC segment values, tree-based segment reuse, probability-mask optimization & SPO-chain reports \textbf{6--12 point} gains over PPO/GRPO on GSM8K; SPO-tree reports \textbf{7--11 point} gains over GRPO on MATH500 under 2K/4K context evaluation. \\
+TreeRPO \cite{treerpo2025} & Tree sampling with step/group relative reward expectations & Reports Qwen2.5-Math average Pass@1 increasing from \textbf{19.0\% to 35.5\%}, plus \textbf{2.9 points} over GRPO and \textbf{18.1\%} shorter responses. \\
+TreePO \cite{treepo2025} & Segment-synchronous tree rollout with dynamic branching/fallback and subgroup-relative advantages & Reports GRPO with TreePO sampling improving overall major@16 accuracy from \textbf{46.63\% to 54.61\%}; TreePO advantage adds \textbf{2.27--3.6 points} while reducing sampling GPU hours by \textbf{12--43\%}. \\
+TEMPO \cite{tempo2025} & Prefix-to-tree conversion of naturally sampled responses with branch-gated TD corrections & Reports higher validation and final performance than PPO/GRPO on Qwen3-1.7B/4B across math and medical QA, with roughly matched wall-clock time. \\
+TreeAdv \cite{treeadv2026} & Entropy-driven rollout forests with token-level redistribution of leaf advantages & Reports consistent gains over GRPO/GSPO across \textbf{10 math benchmarks} while using substantially fewer generated tokens under matched supervision/data/decoding budgets. \\
+TreeRL \cite{treerl2025} & On-policy tree search with value backup from subtree outcomes & Reports improved trajectory diversity and optimization signals relative to independent multi-chain sampling. \\
+APPO \cite{appo2026} & Fine-grained agentic branching score plus procedure-level advantage scaling & Reports nearly \textbf{4-point} improvement over strong agentic RL baselines on \textbf{13 benchmarks} with efficient tool calls. \\
+GRPO-$\lambda$ \cite{grpolambda2025} & Critic-free eligibility-style credit assignment over sequence log-probabilities & Reports \textbf{30--40\%} improved training performance curves and more than \textbf{3 points} average gain over GRPO, including a \textbf{4.5-point} gain for a 7B model. \\
+OAR \cite{oar2026} & Outcome-sensitivity reshaping by perturbation or gradient proxy & Reports significant gains over strong GRPO baselines, with gradient-based OAR-G approaching perturbation-based OAR-P at low overhead. \\
+LamPO \cite{lampo2026} & Pairwise decomposed group advantages with confidence-aware weighting & Reports consistent gains over GRPO and recent RLVR variants on AIME, MATH-500, and GPQA-Diamond. \\
+\hline
+\end{tabular}
+}
+\caption{Representative reported improvements from closely related fine-grained, tree-based, or group-relative RL methods. Bold text highlights the numerical gains reported by the corresponding papers. The values are not directly comparable to our results because computation budget, training scale, evaluation policy, datasets, and supervision assumptions differ.}
+\label{tab:related-reported-results}
+\end{table*}
+
+\section{Implementation-Aligned Pseudocode}
+\label{app:pseudocode}
+Tables~\ref{tab:guided-branching-pseudocode} and~\ref{tab:map-optimization-pseudocode} summarize the two implementation paths most relevant for reimplementation. The pseudocode follows the split pipeline used in the experiments: tree rollout produces unjudged trees, a separate judging pass attaches leaf correctness, and training-set generation computes advantages only after judging.
+
+\begin{table*}[t]
+\centering
+\fbox{\begin{minipage}{0.94\textwidth}
+\small
+\textbf{Input:} question $q$, rollout config $(T,L)$, decoding temperature, force-selected-token flag.\\
+\textbf{Output:} rollout tree with prompt/root segment, generated reasoning/tool segments, leaf answers, and no correctness labels.
+\begin{enumerate}
+    \item Initialize a tree with the prompt segment for $q$ as the root.
+    \item While fewer than $T$ trunk leaves exist, generate a complete response from the root prompt and attach the response as a new trunk leaf.
+    \item While fewer than $L$ total leaves exist:
+    \begin{enumerate}
+        \item Enumerate existing reasoning tokens. Prompt tokens and tool-response tokens are not candidate branch points.
+        \item For the first reasoning token of a segment, treat the candidate as node expansion. Exclude first tokens already used by sibling branches. Choose the highest-probability remaining top-$k$ token if its probability relative to the original top token is at least $0.1$.
+        \item For an internal reasoning token, treat the candidate as a segment split. Exclude the token that was actually generated at that position. Choose the highest-probability remaining top-$k$ token if its relative probability is at least $0.1$.
+        \item Score each node-expansion candidate by alternative-token relative probability times a branching-factor penalty. Score each segment-split candidate by alternative-token relative probability times a segment-length penalty. Entropy replaces relative probability only in the TreeRL-style branching ablation.
+        \item Select the positive-score candidate with maximum score. If no such candidate exists, stop expanding the tree.
+        \item If the candidate is a segment split, split the selected segment before the selected token; if it is node expansion, branch from the selected node.
+        \item If forced branching is enabled, append the selected alternative token to the generation prompt, generate the remaining continuation, and then record that selected token and its stored log probability as the first token of the new branch.
+        \item Attach the generated continuation and update the tree status.
+    \end{enumerate}
+    \item Return the tree artifact. Leaf correctness is intentionally absent and is added only by the judging pass.
+\end{enumerate}
+\end{minipage}}
+\caption{Guided token-level tree construction. This matches the current split-pipeline implementation: branch selection uses model-side top-$k$ token statistics and structural penalties, not posterior uncertainty from leaf judgments.}
+\label{tab:guided-branching-pseudocode}
+\end{table*}
+
+\begin{table*}[t]
+\centering
+\fbox{\begin{minipage}{0.94\textwidth}
+\small
+\textbf{Input:} judged tree with segment set $\mathcal{S}$, leaf labels $y_\ell\in\{+1,-1\}$, and leaf-to-root segment paths.\\
+\textbf{Output:} token-level training trajectories with old log probabilities and clipped advantages.
+\begin{enumerate}
+    \item Discard the root prompt segment from posterior variables. For every non-root segment $i$, initialize mean $m_i=0$ and log standard deviation $u_i=0$.
+    \item For every judged leaf $\ell$, build its path indicator $x_{\ell,i}$ over non-root segments.
+    \item Minimize the negative log posterior
+    \[
+    \sum_i \frac{(m_i-0)^2}{2\sigma_m^2}
+    + \sum_i \frac{u_i^2}{2\sigma_u^2}
+    - \sum_\ell \log \Phi\!\left(
+        \frac{y_\ell \sum_i x_{\ell,i}m_i}
+        {\sqrt{\sum_i x_{\ell,i}\exp(2u_i)+\varepsilon}}
+    \right),
+    \]
+    using gradient descent with backtracking line search for at most 120 iterations.
+    \item Clamp every $u_i$ to $[-4,2]$ after each candidate update.
+    \item Convert posteriors to raw segment scores by $m_i/\exp(u_i)$, divide by a clamped reasoning-token segment length, then normalize scores across segments by subtracting the segment-score mean and dividing by the segment-score standard deviation. If mean subtraction would flip a segment's sign, set that normalized segment score to zero.
+    \item Keep only mixed-correctness questions for training-set generation. All-correct and all-incorrect trees provide no contrastive segment-credit signal and are filtered out.
+    \item Divide each segment score by the number of leaf trajectories that contain that segment so shared-prefix credit is not duplicated across leaves.
+    \item For each selected leaf trajectory, assign the segment score to generated reasoning/tool-call tokens, assign zero and ignored labels to prompt/tool-response tokens, and retain old token log probabilities from rollout.
+    \item Balance positive and negative advantage mass across the emitted training set unless a positive-only ablation is explicitly requested, then clip final token advantages to the configured range.
+\end{enumerate}
+\end{minipage}}
+\caption{MAP segment-credit optimization and conversion to token-level training data. This table describes the default \ours\ advantage path; TreeRPO, TreeRL, and GRPO ablations replace only the segment-advantage calculation step.}
+\label{tab:map-optimization-pseudocode}
+\end{table*}
 
 \section{Qualitative Case Study Details}
 \label{app:case-study-details}

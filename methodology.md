@@ -175,22 +175,25 @@ L_i_clamped = max(reasoning_only_token_length_i, L_floor)
 r_i_len = r_i / L_i_clamped
 ```
 
-We then normalize `r_i_len` across segments in the same tree using standard deviation scaling (without mean-shift sign flips).
+We then normalize `r_i_len` across segments in the same tree by subtracting the within-tree mean and dividing by the within-tree standard deviation. If mean subtraction would flip the sign of a segment score, that normalized score is set to zero.
 
 ## Training Set Construction
 
-Trees are flattened into trajectories that may share prefixes. To avoid repeatedly training shared segments, each segment is assigned to at most one training trajectory.
+Trees are flattened into leaf trajectories that may share prefixes. To avoid multiplying the learning signal on shared segments by the number of descendant leaves, the current implementation keeps all informative leaf trajectories but divides each segment advantage by the number of emitted leaf trajectories that contain that segment.
 
-We use a greedy selection policy:
+The construction policy is:
 
-1. Select the trajectory with the highest per-token average absolute advantage.
-2. Mark all of its segments as consumed.
-3. Repeat selection among trajectories that still contain unconsumed, learnable segments.
-4. Aggregate selected trajectories across trees, rank by average absolute advantage, and prune the lowest-contribution tail.
+1. Drop all-correct and all-incorrect trees, since they have no contrastive segment-credit signal.
+2. Compute segment advantages from the selected credit estimator after judgments are attached.
+3. Count how many emitted leaf trajectories contain each segment.
+4. Divide each segment advantage by this containing-leaf count.
+5. Emit every remaining leaf trajectory with token-level advantages inherited from its segments.
+6. Balance the aggregate positive and negative advantage mass unless a positive-only ablation is explicitly requested.
+7. Clip token-level advantages to the configured range before optimization.
 
 ## Training Sample Ordering
 
-Selected trajectories are ordered by sequence length to improve batch efficiency. Since low-value trajectories are already pruned during selection, no additional value-based ordering is applied.
+Selected trajectories are ordered by question so sibling positive and negative samples from the same problem are consumed consecutively. This ordering is an implementation detail rather than an experimental variable.
 
 ## Epoch Definition in Training Pipeline
 
@@ -261,7 +264,7 @@ Test set construction:
 2. Train TreeMAPPO on the in-distribution training data (`hybrid_train.jsonl`) for each model.
 3. Use in-distribution validation data (`hybrid_val.jsonl`) for checkpoint selection and hyperparameter control.
 4. Re-evaluate pass@1 on all six datasets.
-5. Run five independent trials and report confidence intervals.
+5. Run multiple evaluation trials and report confidence intervals.
 
 ### Ablation Studies
 
@@ -276,7 +279,8 @@ Test set construction:
 ### Reporting Protocol
 
 - Primary metric: pass@1 accuracy.
-- Secondary reporting: confidence intervals from five runs.
+- Secondary reporting: confidence intervals from validation and testing trials.
+- Training rollouts use temperature 0.7; validation and held-out test rollouts use greedy decoding with one trajectory per question. Confidence intervals over trials quantify run-to-run variability in inference and judging, not policy sampling variance or variance over independently seeded training runs.
 - Evaluation scope: both in-distribution and out-of-distribution benchmarks.
 - Final serious tests use five independent rollouts per question with flat evaluation
   trees (`num_trunks = num_leaves = 5`) to reduce stochastic evaluation noise
